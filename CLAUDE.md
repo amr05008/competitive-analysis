@@ -25,6 +25,8 @@ named "worry-or-not".
 - Write "the model", never a model name, in `SKILL.md`.
 - Nothing in the public `claude-channels` skill's harness layer (house config, fan-out,
   Artifact, INTERNAL, Monid CLI) belongs here.
+- Commit and push straight to `main` until a live version is listed in a directory. After
+  that, feature branches and PRs.
 
 ## Test loop
 
