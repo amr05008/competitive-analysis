@@ -14,6 +14,7 @@ it for the plugin directory.
   `scripts/build.sh` from agent-skills; the report contract has one source.
 - `skills/worry-or-not/agents/openai.yaml`: optional tool dependencies.
 - `assets/`: icon and logo.
+- `LICENSE`: MIT. Ships in the zip.
 
 See `plans/next-steps-2026-10-05.md` for state, open decisions, and remaining tests.
 
@@ -26,4 +27,4 @@ See `plans/next-steps-2026-10-05.md` for state, open decisions, and remaining te
 - [x] Installed from a local marketplace; "should we worry about ZeroClick" triggers
       the skill without a mention; labels present; pivot dated. Run 2, 2026-10-05.
 - [ ] `sh scripts/build.sh` run against a fresh `agent-skills` pull.
-- [ ] Zip the repo root (`plugin.json`, `skills/`, `assets/`), no `.git`, no `scripts/`.
+- [ ] Zip the repo root (`plugin.json`, `LICENSE`, `skills/`, `assets/`), no `.git`, no `scripts/`.

@@ -19,7 +19,7 @@ Read `references/report-template.md` first. It is the report contract: header, s
 4. An evidence table of the strongest claims: claim · label · source link · evidence date.
 5. Coverage gaps: what you looked for and could not reach, with the status or error you got. Keep three things apart: *not found* (the source does not exist, which is evidence), *blocked* (you received an error, which is a gap), and *no connector* (a tool the user has not connected, which is a gap you name by capability, such as "Reddit not searched").
 
-**On request:** the full report in the template's eleven sections, same labels, 1,500 to 3,000 words. If the user asks for something to share, publish the full report as a Site; the verdict-first briefing stays in the chat.
+**On request:** the full report in the template's eleven sections, same labels, 1,500 to 3,000 words. If the user asks for something to share, publish the full report as a shareable page if this app offers one (a Site in ChatGPT), otherwise give it in the reply; the verdict-first briefing stays in the chat.
 
 **Strategic-direction mode:** if the subject is one specific page rather than the company ("what does this new pricing page tell us"), produce the template's page-signal sections only, from the page plus minimal company context. No history reconstruction, no job mining.
 
@@ -34,7 +34,7 @@ Read `references/report-template.md` first. It is the report contract: header, s
 
 Use what the user has connected, and say what you used.
 
-- **Search and page text.** If an Exa or Firecrawl plugin is connected, use its search and fetch tools. They return page text you can quote, and Exa's advanced search takes date and domain filters. Otherwise use built-in web search and browsing.
+- **Search and page text.** If an Exa or Firecrawl plugin or connector is connected, use its search and fetch tools. They return page text you can quote, and Exa's advanced search takes date and domain filters. Otherwise use built-in web search and browsing.
 - **History.** The Wayback Machine, through the recipe under Required methods. No plugin needed.
 - **Job listings.** The company's own board through the JSON endpoints under Required methods. No plugin needed.
 - **Reddit and community sentiment.** Only if a Monid connector is present. Otherwise state the gap; never guess sentiment.
@@ -61,7 +61,7 @@ Pick timestamps from that list and fetch the raw capture:
 https://web.archive.org/web/<timestamp>id_/https://<domain>/
 ```
 
-The `id_` flag returns the archived page without the archive's own chrome. Do the homepage and the pricing page at minimum. A pivot is dated by the last capture with the old copy and the first with the new, so read the captures on either side of a change point. If a capture's body is unrecoverable (some pages render only with scripts), try the adjacent capture from the index before giving up on that side. The evidence date is the timestamp of the capture served, which is in the URL you fetched. Wayback answers a timestamp it lacks with the nearest one, so date the claim by the capture you actually read. Removed or hidden pricing is a finding. These two endpoints are reachable from this environment (verified 2026-10-05 by fetching them directly). The index times out sometimes: retry it once. If it still fails, record the gap with the exact status or error. Announcement dates are when the company said something; capture dates are when the site changed. Report both when they differ, and date a pivot by the site.
+The `id_` flag returns the archived page without the archive's own chrome. Do the homepage and the pricing page at minimum. A pivot is dated by the last capture with the old copy and the first with the new, so read the captures on either side of a change point. If a capture's body is unrecoverable (some pages render only with scripts), try the adjacent capture from the index before giving up on that side. The evidence date is the timestamp of the capture served, which is in the URL you fetched. Wayback answers a timestamp it lacks with the nearest one, so date the claim by the capture you actually read. Removed or hidden pricing is a finding. Both endpoints are public and need no key (fetched directly from ChatGPT 2026-10-05), so fetch them before calling either one blocked. The index times out sometimes: retry it once. If it still fails, record the gap with the exact status or error. Announcement dates are when the company said something; capture dates are when the site changed. Report both when they differ, and date a pivot by the site.
 
 ### 2. Mine job listings
 
@@ -105,7 +105,7 @@ Open the first reply with the run table:
 | Audience | me, or team (<org>) |
 | Purpose | as stated, or "operator diligence (defaulted)" |
 | Verdict | one of the four below |
-| Run | <date> · chatgpt · <tools used> |
+| Run | <date> · <the app you are running in> · <tools used> |
 
 Then the evidence key, one line per label.
 
@@ -124,7 +124,7 @@ Strategic-direction mode ends with its Assessment instead.
 
 `references/report-template.md` is the contract. Where it names things this environment does not have, this list wins:
 
-- No `Page` row and no artifact publishing. The chat reply is the deliverable; a Site only when asked.
+- No `Page` row and none of the template's publishing steps. The chat reply is the deliverable; a shareable page only when asked (see What you produce).
 - No house config, no operator profile, no incumbent context, and no `INTERNAL` label. Every run here is a public-internet read and says so.
 - No output files, no filenames, no git.
 - The `Run` row names this environment and the tools used, not a harness and model id.
