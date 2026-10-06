@@ -15,13 +15,15 @@ it for the plugin directory.
 - `skills/worry-or-not/agents/openai.yaml`: optional tool dependencies.
 - `assets/`: icon and logo.
 
+See `plans/next-steps-2026-10-05.md` for state, open decisions, and remaining tests.
+
 ## Before submission
 
-- [ ] Fetch test passed in ChatGPT (CDX, raw `id_` capture, Greenhouse and Ashby JSON).
+- [x] Fetch test passed in ChatGPT (CDX, raw `id_` capture, Greenhouse and Ashby JSON). 2026-10-05
 - [ ] `developerName` matches the verified identity exactly.
 - [ ] Privacy and terms pages live at the URLs in `plugin.json`.
-- [ ] `assets/icon-small.svg` and `assets/logo.png` exist.
-- [ ] Installed from a local marketplace; "should we worry about ZeroClick" triggers
-      the skill without a mention; labels present; pivot dated.
+- [x] `assets/icon-small.svg` and `assets/logo.png` exist.
+- [x] Installed from a local marketplace; "should we worry about ZeroClick" triggers
+      the skill without a mention; labels present; pivot dated. Run 2, 2026-10-05.
 - [ ] `sh scripts/build.sh` run against a fresh `agent-skills` pull.
 - [ ] Zip the repo root (`plugin.json`, `skills/`, `assets/`), no `.git`, no `scripts/`.
