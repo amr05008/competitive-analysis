@@ -39,7 +39,7 @@ Use what the user has connected, and say what you used.
 - **Job listings.** The company's own board through the JSON endpoints under Required methods. No plugin needed.
 - **Reddit and community sentiment.** Only if a Monid connector is present. Otherwise state the gap; never guess sentiment.
 - One search per question. Do not loop a paid tool to widen a result set.
-- **Fetch URLs directly.** When this skill gives you a URL, open it with the browser or fetch tool exactly as written. Never search for a URL you already have; a search result is not a fetch, and "inaccessible" without the status or error you received is not a finding.
+- **Fetch URLs directly.** When this skill gives you a URL, open it exactly as written with a tool that returns the raw response: a fetch or page-read tool (a connected Exa or Firecrawl fetch counts). The Wayback and job-board URLs return JSON or raw archived HTML, which an interactive browser often blocks, so use the browser only when nothing else can open the URL. If one tool refuses a URL ("not accessible", a blocked-by-client error), try another before recording the gap, and record the exact error from each. Never search for a URL you already have; a search result is not a fetch, and "inaccessible" without the status or error you received is not a finding.
 
 If a tool a method needs is not available, the method is discharged by recording the gap. A blocked source is a finding, not a puzzle.
 
@@ -49,19 +49,35 @@ These produce most of what a teardown is for. A teardown that skips them is the 
 
 ### 1. Reconstruct history (Wayback)
 
-Ask the index what exists before fetching a capture. The CDX index lists every capture of a URL; `collapse=digest` keeps only captures where the page's bytes changed, which is the list of candidate dates for a copy or pricing pivot.
+Date when the homepage and pricing copy changed by reading captures at chosen dates and narrowing in on each change. Look up the capture nearest a date:
 
 ```
-https://web.archive.org/cdx/search/cdx?url=<domain>/&output=json&fl=timestamp,statuscode,digest&filter=statuscode:200&collapse=digest&from=<YYYY>&to=<YYYY>
+https://archive.org/wayback/available?url=<domain>/<path>&timestamp=<YYYYMMDD>
 ```
 
-Pick timestamps from that list and fetch the raw capture:
+The JSON names the nearest capture and its exact `timestamp`. Fetch that capture raw:
 
 ```
-https://web.archive.org/web/<timestamp>id_/https://<domain>/
+https://web.archive.org/web/<timestamp>id_/https://<domain>/<path>
 ```
 
-The `id_` flag returns the archived page without the archive's own chrome. Do the homepage and the pricing page at minimum. A pivot is dated by the last capture with the old copy and the first with the new, so read the captures on either side of a change point. If a capture's body is unrecoverable (some pages render only with scripts), try the adjacent capture from the index before giving up on that side. The evidence date is the timestamp of the capture served, which is in the URL you fetched. Wayback answers a timestamp it lacks with the nearest one, so date the claim by the capture you actually read. Removed or hidden pricing is a finding. Both endpoints are public and need no key (fetched directly from ChatGPT 2026-10-05), so fetch them before calling either one blocked. The index times out sometimes: retry it once. If it still fails, record the gap with the exact status or error. Announcement dates are when the company said something; capture dates are when the site changed. Report both when they differ, and date a pivot by the site.
+The `id_` flag returns the archived page without the archive's own chrome.
+
+1. Read the live page, then the captures nearest dates about three months apart, going back 24 months. Compare the title and headline copy.
+2. Where the copy differs between two neighboring captures, look up the date halfway between and read it. Keep halving until the last capture with the old copy and the first with the new are about two weeks apart, or no capture lies between them. That pair brackets the change.
+3. Do the homepage and the pricing page at minimum. For pricing, read the captures at both ends of the window and on either side of the homepage's change points, and narrow only where pricing changed.
+
+If a capture's body is unrecoverable (some pages render only with scripts), compare its `<title>`, or look up a date a week away. An empty `archived_snapshots` means no capture near that date, or a flaky answer: retry once, then try a date a week away. If a lookup or capture still fails, record the gap with the exact status or error. These URLs are public, need no key, and usually answer within a few seconds, so fetch them before calling any of them blocked.
+
+The evidence date is the timestamp of the capture served, from the lookup and in the URL you fetched, never the date you asked for: Wayback answers with the nearest capture it has. Removed or hidden pricing is a finding. Announcement dates are when the company said something; capture dates are when the site changed. Report both when they differ, and date a pivot by the site.
+
+Optional: the CDX index lists every capture whose bytes changed, which can point to change dates between your lookups.
+
+```
+https://web.archive.org/cdx/search/cdx?url=<domain>/&output=json&fl=timestamp,digest&collapse=digest&from=<YYYYMM>&to=<YYYYMM>
+```
+
+It is slow (often 6 to 12 seconds), and most of its entries are page rebuilds, not copy changes. Try it at most once; if it times out, carry on with lookups. A CDX timeout is not a coverage gap when the lookups worked.
 
 ### 2. Mine job listings
 
@@ -126,6 +142,7 @@ Strategic-direction mode ends with its Assessment instead.
 
 - No `Page` row and none of the template's publishing steps. The chat reply is the deliverable; a shareable page only when asked (see What you produce).
 - No house config, no operator profile, no incumbent context, and no `INTERNAL` label. Every run here is a public-internet read and says so.
+- Wayback: the date-lookup method under Required methods replaces the template's "start from the CDX index's change points". The CDX index is optional here.
 - No output files, no filenames, no git.
 - The `Run` row names this environment and the tools used, not a harness and model id.
 - Length band for the full report on request: 1,500 to 3,000 words.

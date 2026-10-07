@@ -18,13 +18,50 @@ ships to both.
 - **Container decided: skills-only.** ChatGPT's browser fetches the Wayback CDX index, raw
   `id_` captures, and the Greenhouse/Ashby JSON boards directly (test chat:
   https://chatgpt.com/share/6ac44d42-7074-83e9-b90a-36c0db37f98c). No server needed.
-- **Identity verification:** Persona done 2026-10-05, OpenAI shows "Identity in review".
+- **Identity verification: approved 2026-10-06** as an Individual (solo developer).
+  Organization name on platform.openai.com: "Aaron Roy".
 - **Two test runs on ZeroClick** through the local marketplace:
   - Run 1 (skill v1): https://chatgpt.com/s/cx_6ac44facde3c8191a8543d6469c100b9 — shape,
     labels, three of four findings right; Wayback and job boards not actually fetched.
   - Run 2 (skill v2): https://chatgpt.com/s/cx_6ac451a848f881919ea8b1886737f616 — Wayback
     ran (pivot bracketed May 20–June 14), boards checked and reported as not found,
     verdict "promising but unproven" vs Claude Code's "structurally challenged".
+  - Run 3 / Exa control (reworded skill, no Exa, 2026-10-06):
+    https://chatgpt.com/s/cx_6ac5ac6cb16c8191b0ca89c4f6610721 — rewording loaded (Run row
+    reads "Codex desktop"). Labels, funding, contradiction and absence work all good; two
+    findings Run 2 missed (Stripe MPP as the threat, the Zero buyer index). **Wayback and
+    boards blocked:** it went through the in-app browser ("not accessible via this tool",
+    `ERR_BLOCKED_BY_CLIENT`) where Run 2 used direct page reads, so the pivot was dated
+    only by the July 21 announcement. Verdict "promising but unproven" again. **No Exa
+    connect prompt:** `agents/openai.yaml` did not make the app ask to connect Exa.
+  - Run 4 / Exa on (same skill, Exa plugin installed, 2026-10-06):
+    https://chatgpt.com/s/cx_6ac5ae53335881918abfa41eec0393e6 — still Codex (Run row says
+    "Codex"), so Exa is the only change from Run 3. **Our skill ran**; Exa's plugin did not
+    take the trigger. **Exa used unprompted** for search and fetch. Its fetch reached the
+    boards (all three `CRAWL_NOT_FOUND`, correctly reported as not found) and Wayback, but
+    the homepage CDX index timed out twice (`CRAWL_LIVECRAWL_TIMEOUT`), so the pivot again
+    went undated by the site. Same verdict, about the same findings as Run 2 (new:
+    ActionLayer storefront; dropped: Stripe MPP, Zero index, G2).
+  - **Exa answers.** Use it? Optional, not recommended: on ZeroClick it changed neither the
+    verdict nor the key findings; its real value was a fetch path the in-app browser
+    blocks. Bring your own? Yes: a user-connected Exa was picked up with no change on our
+    side, and the skill runs without it (Run 3). Listing copy should mention Exa, since the
+    app won't prompt for it. Cost: $0.05 of Exa credit for the whole teardown ($20.00 →
+    $19.95).
+  - **Wayback is the weak point:** site-dated pivot in 1 of 4 runs (Run 2 only).
+  - Run 5 / Wayback fix, Exa off (2026-10-06):
+    https://chatgpt.com/s/cx_6ac5b148f8748191a6650b4addd40540 — **tool routing fixed** (Run
+    row: "page reads, direct public-page fetches", no browser). **Wayback inconclusive:**
+    lookups came back empty, then timeouts and connection resets. Checked from a terminal
+    straight after: archive.org was degraded (503 "Temporarily Offline", empty
+    `archived_snapshots` after 12 s, 20 s timeouts) where an hour earlier the same calls
+    took 1–2 s. The skill handled it as written: retried, recorded the errors, dated the
+    pivot by announcement and said the site date was unverified. Boards: Greenhouse and
+    Lever 404 (not found); Ashby 403 to the app but 404 from a terminal, so Ashby blocks the
+    app's fetcher. New findings: seller terms that put implementation fees and revenue share
+    in an order form, against the advertised $0 setup / 5% (a good contradiction catch).
+    Note: a degraded archive answers the lookup with an empty result, not an error, so
+    "empty" can't be read as "no captures" without a retry.
   - A stray run used the Claude Code skill via Codex (the app reads `~/.agents/skills`):
     https://chatgpt.com/s/cx_6ac4516b7ca48191af87beebdcaf0720. Same trigger phrase; the
     plugin still won on the explicit prompt. Keep in mind when testing.
@@ -42,9 +79,11 @@ ships to both.
    this directory's path (and the symlink), the three aaronroy.com pages and their URLs,
    and the GitHub repo name. One commit, one app restart. Settle it before the Claude
    manifest exists, so that one starts with the final name.
-2. **Developer name** must match the verified identity exactly. Read it off
-   https://platform.openai.com/plugins once verification clears and set
-   `extensions.com.openai.interface.developerName`.
+2. **Developer name** must match the verified identity exactly. Verification cleared
+   2026-10-06 and the organization name is "Aaron Roy", which is what
+   `extensions.com.openai.interface.developerName` already says. Still to confirm: the name
+   shown for the verified identity at https://platform.openai.com/plugins (submission
+   step 4), in case it uses the legal name from the ID check instead.
 3. **Verdict calibration.** Two runs landed one notch softer than the Claude Code run on
    the same facts. Decide whether that's acceptable (two analysts can differ) or whether
    the skill should push harder on "the rail owners give the product away" style reasoning.
@@ -74,6 +113,22 @@ ships to both.
      user-connected Exa with no change on our side, and still runs and states the gap
      without one. The answer carries to Claude, where Exa is a connector the user
      connects from the plugin's Connectors tab.
+- **Wayback fix (written 2026-10-06, needs a rerun).** Run 3 sent Wayback and the boards
+  through the in-app browser, which blocked them; Run 4's CDX query timed out. Timed from a
+  terminal: CDX 6–12 s, the availability API 1–2 s, an `id_` capture under 1 s. `SKILL.md`
+  now (a) dates changes by availability-API lookups about three months apart, then halves
+  the interval that changed, with CDX optional and tried at most once; (b) says to fetch
+  with a fetch or page-read tool, not the in-app browser, and to try another tool before
+  recording a gap. Seven lookups from the terminal bracketed ZeroClick's pivot to May 20–
+  June 6 (title "The Ad Platform for AI" → "The OS for Selling to Agents"), tighter than
+  Run 2. Test: a one-line fetch of the availability API in Codex, then ZeroClick with Exa
+  off (compare with Run 3). If it holds, port it to the Claude Code `competitive-analysis`
+  skill and its template, which still start from CDX.
+- **One run in a regular ChatGPT chat**, not Codex. Every plugin run so far is a `cx_`
+  (Codex) link; the fetch test that passed was a ChatGPT chat. Directory users will mostly
+  be in chat, and its fetch tools may differ. Run 4 was meant to be a chat run but still
+  reports Codex. A chat run's share link is `chatgpt.com/share/...`, not `/s/cx_...`. If a
+  locally installed plugin only loads in Codex, this test waits until after submission.
 - **A second company** with a real job board (Greenhouse or Ashby) so method 2 runs for
   real. Candidates with public boards verified today: Vercel (Greenhouse), Linear (Ashby),
   Ramp (Ashby).
