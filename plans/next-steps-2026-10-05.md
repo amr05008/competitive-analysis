@@ -1,5 +1,24 @@
 # Next steps for the plugin (written 2026-10-05, end of day)
 
+## Pick up here (updated 2026-10-06, end of night)
+
+Close to submittable. In order; items 1–3 block the ChatGPT submission.
+
+1. **Wayback rerun.** First check archive.org is healthy: open
+   `https://archive.org/wayback/available?url=zeroclick.ai&timestamp=20260601` in a
+   browser; JSON within a couple of seconds means go. Then a new Codex chat, Exa off,
+   `Should we worry about ZeroClick? zeroclick.ai`. Pass: the pivot is bracketed from
+   captures (terminal lookups put it at May 20–June 6). Fail with a healthy archive means
+   the app's fetch tool, not the archive: bring the exact error. If you take decision 5's
+   connector rewrite, make it before this run so one rerun covers both.
+2. **Name** (decision 1). Everything a rename touches is listed there. One commit.
+3. **Developer name** at the upload screen (decision 2), then the remaining submission
+   steps: site pages deployed, `build.sh`, zip, upload.
+4. **Decide 3 and 5** (verdict calibration; what makes this stronger than default skills).
+   Neither blocks the submission.
+5. **Remaining tests** under Testing still to do.
+6. **Claude fast follow** once ChatGPT is submitted.
+
 ## Sequencing (decided 2026-10-05)
 
 ChatGPT first. Claude is a fast follow after the ChatGPT submission.
@@ -95,8 +114,36 @@ ships to both.
    ChatGPT)" in both places it appeared, the Wayback endpoints line says it was verified
    from ChatGPT, and the search tools line says "plugin or connector". Neither host is
    named except as that one example. The submitted version is the shared one, so the
-   Claude port doesn't cost a second ChatGPT review. **Still to do:** rerun ZeroClick
-   once on ChatGPT to confirm the rewording changed nothing.
+   Claude port doesn't cost a second ChatGPT review. Confirmed by Run 3: the reworded
+   skill loaded and the report kept its shape.
+5. **What makes this stronger than default competitive-analysis skills** (raised
+   2026-10-06; proposed, not decided).
+   - **Connectors: one generic rule, not vendor branches.** Rewrite the Tools section as
+     capability slots: search and page text (Exa, Firecrawl); company data such as
+     headcount history and funding (Clay, Harmonic, Crunchbase); community sentiment (Monid
+     or any Reddit connector). Use whatever connected tool fills a slot, name it in the Run
+     row, never require one, company data only (no people, no contacts). Why not more:
+     Exa cost $0.05 and added no findings on ZeroClick; most directory users will connect
+     nothing; Monid isn't in the ChatGPT directory. The one connector signal with proven
+     value is headcount history: the Claude Code teardown's 35 → 24 drop (Clay) lined up
+     with the pivot.
+   - **The strength is the free methods firing on default tools, plus a verdict that takes
+     a position.** Wayback dated the pivot in 1 of 4 runs so far, and three plugin runs
+     hedged to "promising but unproven" where the Claude Code teardown said "structurally
+     challenged" on the same facts (decision 3). Hedging to the middle is what a default
+     skill does.
+   - **Prove it head to head** rather than guess: run the two leading Claude skills
+     (Firecrawl `competitive-intel`, Anthropic `competitive-intelligence`) and this one on
+     ZeroClick plus a company with a public board, scored on the same rubric (§ Scoring).
+     That answers "strong enough?" with evidence and is write-up material.
+   - **Sequencing:** none of this blocks the ChatGPT submission, which has no analytics and
+     broken discovery. Do the head-to-head before the Claude launch, where those competitors
+     and the usage numbers are.
+   - Checked 2026-10-06 and set aside: SEC Form D filings as a free funding source. EDGAR
+     returns 403 to a request without a declared User-Agent, and the apps' fetch tools
+     probably can't set one (untested in the app).
+   - Default: capability slots go into v1 (small wording change, rides the Wayback rerun);
+     head-to-head before the Claude launch.
 
 ## Testing still to do
 
@@ -138,6 +185,30 @@ ships to both.
 - **Length and truncation** of the full report on request.
 - **Directory collision check:** search the Plugins directory in the app for the chosen
   name before submitting.
+
+## Scoring
+
+Record per run: share link, Exa on or off, the app named in the Run row, which skill fired.
+
+Checklist (from `claude-channels/plans/worry-or-not-2026-10-05.md` step 5, extended):
+
+- Triggers without an @-mention, and it's this skill (run table + evidence key + three-way
+  coverage gaps), not the Claude Code `competitive-analysis` skill or a connector's own.
+- A label on every material claim.
+- Pivot dated by site captures, not only by the announcement.
+- Funding present; hiring present, or the boards correctly reported as not found / blocked
+  with the status.
+- Connected tools used and named in the Run row.
+- Coverage gaps split into not found / blocked / no connector, with exact errors.
+
+Reference: the Claude Code teardown,
+`~/repos/vault/projects/teardowns/2026-09-26-zeroclick-teardown.md`. Verdict "structurally
+challenged"; pivot May–June 2026 (terminal lookups 2026-10-06: May 20–June 6); $55M raised
+(COMPANY-CLAIMED); Sleek post rewritten under its original date (Wayback); headcount 35 →
+24 (Clay, which the plugin doesn't have).
+
+Reading share links: `chatgpt.com/s/cx_...` returns 403 to WebFetch and curl. Open it in
+Chrome (Claude in Chrome) and read the page text.
 
 ## Submission steps (when ready)
 

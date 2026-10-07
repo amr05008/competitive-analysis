@@ -3,7 +3,8 @@
 A ChatGPT and Codex plugin that produces an evidence-graded teardown of one company.
 The method comes from the `competitive-analysis` skill in
 [amr05008/agent-skills](https://github.com/amr05008/agent-skills); this repo packages
-it for the plugin directory.
+it for the plugin directory. Claude follows from the same package after the ChatGPT
+submission.
 
 ## Layout
 
@@ -26,5 +27,7 @@ See `plans/next-steps-2026-10-05.md` for state, open decisions, and remaining te
 - [x] `assets/icon-small.svg` and `assets/logo.png` exist.
 - [x] Installed from a local marketplace; "should we worry about ZeroClick" triggers
       the skill without a mention; labels present; pivot dated. Run 2, 2026-10-05.
+- [ ] Wayback rerun with the date-lookup method dates the ZeroClick pivot from captures
+      (Exa off). Run 5 was inconclusive: archive.org was down.
 - [ ] `sh scripts/build.sh` run against a fresh `agent-skills` pull.
 - [ ] Zip the repo root (`plugin.json`, `LICENSE`, `skills/`, `assets/`), no `.git`, no `scripts/`.

@@ -1,8 +1,10 @@
 # Worry Or Not (working name) — repo notes for agents
 
-A skills-only ChatGPT/Codex plugin that packages the `competitive-analysis` method.
-The name is provisional; see `plans/next-steps-2026-10-05.md` before changing anything
-named "worry-or-not".
+A skills-only ChatGPT/Codex plugin that packages the `competitive-analysis` method. Claude
+is the fast follow: the same package with one added manifest, after the ChatGPT
+submission. The name is provisional. Start at § Pick up here in
+`plans/next-steps-2026-10-05.md`, and read it before changing anything named
+"worry-or-not".
 
 ## Where things live
 
@@ -33,6 +35,7 @@ named "worry-or-not".
 1. Edit `skills/worry-or-not/SKILL.md`.
 2. Quit the ChatGPT desktop app (Cmd+Q), reopen, Plugins → "Aaron's local plugins" →
    reinstall if offered.
-3. New chat, no @-mention: `Should we worry about ZeroClick? zeroclick.ai`
-4. Score against `plans/next-steps-2026-10-05.md` § Scoring, and against the Claude Code
-   teardown at `~/repos/vault/projects/teardowns/2026-09-26-zeroclick-teardown.md`.
+3. New chat, no @-mention: `Should we worry about ZeroClick? zeroclick.ai`. Runs so far are
+   Codex chats in the app (share links `chatgpt.com/s/cx_...`). Note whether Exa is on.
+4. Score against `plans/next-steps-2026-10-05.md` § Scoring, which also covers the Claude
+   Code reference teardown and how to read share links (Chrome; WebFetch gets 403).
