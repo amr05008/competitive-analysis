@@ -278,7 +278,15 @@ ships to both.
   real. Use Vercel (Greenhouse): Ashby has answered the app's fetcher with 403. This run
   also tests the Wayback pacing rule on a site with a long archive. Candidates with public boards verified today: Vercel (Greenhouse), Linear (Ashby),
   Ramp (Ashby).
-- **Strategic-direction mode:** one run with a specific page URL as the subject.
+- **Strategic-direction mode.** Run 8, `What does manychat.com/brands signal?`
+  (2026-10-11, pasted, not shared): page-signal sections only, ended with an Assessment,
+  labels throughout, got past the page's bot block (403 to a terminal fetch) by browsing,
+  honest gaps. Missed two cheap signals the mode excluded: when the page appeared (first
+  archived June 5, 2026) and related hiring (a public affiliate-partnerships role against an
+  audience that names affiliate programs). `SKILL.md` now adds two light checks to the mode:
+  the earliest capture via `/web/19960101id_/`, which redirects to it ("first archived on",
+  never "launched"), and job titles tied to the page's bet. Untested. Accuracy grades from
+  Aaron pending; record scores only (Manychat is his employer).
 - **Trigger test** ("teardown of X and its landing page" passed in Run 7; "competitive
   analysis of X" still to do without the @-mention). Description rewritten 2026-10-11 to lead with the ways people ask
   ("analyze this company", "teardown of X", "competitive analysis of X", "research this

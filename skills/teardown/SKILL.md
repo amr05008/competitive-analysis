@@ -21,7 +21,10 @@ Read `references/report-template.md` first. It is the report contract: header, s
 
 **On request:** the full report in the template's eleven sections, same labels, 1,500 to 3,000 words. If the user asks for something to share, publish the full report as a shareable page if this app offers one (a Site in ChatGPT), otherwise give it in the reply; the verdict-first briefing stays in the chat.
 
-**Strategic-direction mode:** if the subject is one specific page rather than the company ("what does this new pricing page tell us"), produce the template's page-signal sections only, from the page plus minimal company context. No history reconstruction, no job mining.
+**Strategic-direction mode:** if the subject is one specific page rather than the company ("what does this new pricing page tell us"), produce the template's page-signal sections only, from the page plus minimal company context. No full history reconstruction or job mining; instead, two light checks of about five fetches in all:
+
+1. **When the page appeared.** Fetch `https://web.archive.org/web/19960101id_/https://<domain>/<path>`: Wayback redirects to the page's earliest capture, and that timestamp is its first-archived date. If the page is older than six months, also read the capture from about six months back and say what changed. Report it as "first archived on", never as a launch date: a page can exist before the archive first sees it.
+2. **Hiring that bears on the page.** Fetch the job board through the endpoints under Required methods, read the titles, and name any roles tied to the bet the page signals. Read the full description of the one or two most relevant roles only. No relevant roles is worth a line; no board is a gap.
 
 ## Setup
 
@@ -147,6 +150,7 @@ Strategic-direction mode ends with its Assessment instead.
 - No `Page` row and none of the template's publishing steps. The chat reply is the deliverable; a shareable page only when asked (see What you produce).
 - No house config, no operator profile, no incumbent context, and no `INTERNAL` label. Every run here is a public-internet read and says so.
 - Wayback: the dated-fetch method under Required methods replaces the template's "start from the CDX index's change points". The CDX index is optional here.
+- Strategic-direction mode adds two light checks the template doesn't ask for (first-archived date, related hiring). Their findings go in Signal interpretation; the template's section list is otherwise unchanged.
 - No output files, no filenames, no git.
 - The `Run` row names this environment and the tools used, not a harness and model id.
 - Length band for the full report on request: 1,500 to 3,000 words.
