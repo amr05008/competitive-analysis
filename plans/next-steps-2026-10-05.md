@@ -49,13 +49,13 @@ session, and the next session starts from the new path.
    `~/repos/competitive-analysis`.
 6. This plan: the paths in Pick up here and the Claude section. Commit and push.
 
-**B. GitHub**
+**B. GitHub** — done 2026-10-11
 
 7. `gh repo rename competitive-analysis -R amr05008/worry-or-not` (the name was free on
    2026-10-11). GitHub redirects the old URL. Stays private until the submission hour.
 8. `git remote set-url origin https://github.com/amr05008/competitive-analysis.git`.
 
-**C. aaronroy.com, branch `worry-or-not-pages`**
+**C. aaronroy.com, branch `worry-or-not-pages`** — done 2026-10-11 (`82de533`; main merged in, 44 smoke tests pass; branch name kept)
 
 9. Bring the branch up to date with `main`, which has moved since the branch was cut.
 10. `git mv src/pages/worry-or-not src/pages/competitive-analysis`. Replace "Worry Or Not" in
