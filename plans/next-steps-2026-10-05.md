@@ -69,7 +69,7 @@ session, and the next session starts from the new path.
 13. Don't merge yet. The pages go live with the repo flip, just before upload (Submission
     steps).
 
-**D. This machine (last, at the end of a session)**
+**D. This machine (last, at the end of a session)** — 14–16 done 2026-10-11; 17–18 next
 
 14. In the app: uninstall the Worry Or Not plugin, then quit (Cmd+Q).
 15. `mv ~/.codex/plugins/worry-or-not ~/.codex/plugins/competitive-analysis`;
