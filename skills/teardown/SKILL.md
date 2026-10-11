@@ -49,35 +49,37 @@ These produce most of what a teardown is for. A teardown that skips them is the 
 
 ### 1. Reconstruct history (Wayback)
 
-Date when the homepage and pricing copy changed by reading captures at chosen dates and narrowing in on each change. Look up the capture nearest a date:
+Date when the homepage and pricing copy changed by reading captures at chosen dates and narrowing in on each change. Fetch the capture nearest a date directly:
+
+```
+https://web.archive.org/web/<YYYYMMDD>id_/https://<domain>/<path>
+```
+
+Wayback redirects to the nearest capture it has, and the `id_` flag returns that page without the archive's own chrome. The capture's exact timestamp is in the URL you end up at: `/web/<14-digit timestamp>id_/`.
+
+If your tool doesn't show the URL it ended up at, get the timestamp from the availability lookup, then fetch `https://web.archive.org/web/<timestamp>id_/https://<domain>/<path>`:
 
 ```
 https://archive.org/wayback/available?url=<domain>/<path>&timestamp=<YYYYMMDD>
 ```
 
-The JSON names the nearest capture and its exact `timestamp`. Fetch that capture raw:
-
-```
-https://web.archive.org/web/<timestamp>id_/https://<domain>/<path>
-```
-
-The `id_` flag returns the archived page without the archive's own chrome.
+The lookup sometimes answers with an empty `archived_snapshots` even when captures exist, so an empty answer there is not evidence that none exist.
 
 1. Read the live page, then the captures nearest dates about three months apart, going back 24 months. Compare the title and headline copy.
-2. Where the copy differs between two neighboring captures, look up the date halfway between and read it. Keep halving until the last capture with the old copy and the first with the new are about two weeks apart, or no capture lies between them. That pair brackets the change.
+2. Where the copy differs between two neighboring captures, fetch the date halfway between and read it. Keep halving until the last capture with the old copy and the first with the new are about two weeks apart, or no capture lies between them. That pair brackets the change.
 3. Do the homepage and the pricing page at minimum. For pricing, read the captures at both ends of the window and on either side of the homepage's change points, and narrow only where pricing changed.
 
-If a capture's body is unrecoverable (some pages render only with scripts), compare its `<title>`, or look up a date a week away. An empty `archived_snapshots` means no capture near that date, or a flaky answer: retry once, then try a date a week away. If a lookup or capture still fails, record the gap with the exact status or error. These URLs are public, need no key, and usually answer within a few seconds, so fetch them before calling any of them blocked.
+If a capture's body is unrecoverable (some pages render only with scripts), compare its `<title>`, or fetch a date a week away. If a fetch fails, retry once, then try a date a week away; if that fails too, record the gap with the exact status or error. These URLs are public, need no key, and usually answer within a second or two, so fetch them before calling any of them blocked.
 
-The evidence date is the timestamp of the capture served, from the lookup and in the URL you fetched, never the date you asked for: Wayback answers with the nearest capture it has. Removed or hidden pricing is a finding. Announcement dates are when the company said something; capture dates are when the site changed. Report both when they differ, and date a pivot by the site.
+The evidence date is the timestamp of the capture served, from the URL you ended up at or from the lookup, never the date you asked for: Wayback answers with the nearest capture it has. Removed or hidden pricing is a finding. Announcement dates are when the company said something; capture dates are when the site changed. Report both when they differ, and date a pivot by the site.
 
-Optional: the CDX index lists every capture whose bytes changed, which can point to change dates between your lookups.
+Optional: the CDX index lists every capture whose bytes changed, which can point to change dates between your fetches.
 
 ```
 https://web.archive.org/cdx/search/cdx?url=<domain>/&output=json&fl=timestamp,digest&collapse=digest&from=<YYYYMM>&to=<YYYYMM>
 ```
 
-It is slow (often 6 to 12 seconds), and most of its entries are page rebuilds, not copy changes. Try it at most once; if it times out, carry on with lookups. A CDX timeout is not a coverage gap when the lookups worked.
+It is slow (often 6 to 12 seconds), and most of its entries are page rebuilds, not copy changes. Try it at most once; if it times out, carry on with dated fetches. A CDX timeout is not a coverage gap when the dated fetches worked.
 
 ### 2. Mine job listings
 
@@ -142,7 +144,7 @@ Strategic-direction mode ends with its Assessment instead.
 
 - No `Page` row and none of the template's publishing steps. The chat reply is the deliverable; a shareable page only when asked (see What you produce).
 - No house config, no operator profile, no incumbent context, and no `INTERNAL` label. Every run here is a public-internet read and says so.
-- Wayback: the date-lookup method under Required methods replaces the template's "start from the CDX index's change points". The CDX index is optional here.
+- Wayback: the dated-fetch method under Required methods replaces the template's "start from the CDX index's change points". The CDX index is optional here.
 - No output files, no filenames, no git.
 - The `Run` row names this environment and the tools used, not a harness and model id.
 - Length band for the full report on request: 1,500 to 3,000 words.

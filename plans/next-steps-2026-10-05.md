@@ -4,13 +4,13 @@
 
 Close to submittable. In order; items 1–3 block the ChatGPT submission.
 
-1. **Wayback rerun.** First check archive.org is healthy: open
-   `https://archive.org/wayback/available?url=zeroclick.ai&timestamp=20260601` in a
-   browser; JSON within a couple of seconds means go. Then a new Codex chat, Exa off,
-   `Should we worry about ZeroClick? zeroclick.ai`. Pass: the pivot is bracketed from
-   captures (terminal lookups put it at May 20–June 6). Fail with a healthy archive means
-   the app's fetch tool, not the archive: bring the exact error. If you take decision 5's
-   connector rewrite, make it before this run so one rerun covers both.
+1. **Wayback rerun, combined with rename step 17.** First check archive.org is up: open
+   `https://web.archive.org/web/20260601id_/https://zeroclick.ai/` in a browser; a page
+   within a couple of seconds means go. Then reinstall the plugin, new Codex chat, Exa off,
+   `Should we worry about ZeroClick? zeroclick.ai`. Pass: the `teardown` skill fires, and
+   the pivot is bracketed from captures (terminal fetches put it at May 20–June 6). Fail
+   with the archive up means the app's fetch tool: bring the exact error. If you take
+   decision 5's connector rewrite, make it before this run so one rerun covers both.
 2. **Rename** to Competitive Analysis (decision 1, decided 2026-10-11): § Rename checklist.
 3. **Developer name** at the upload screen (decision 2), then the remaining submission
    steps: site pages deployed, `build.sh`, zip, upload.
@@ -230,7 +230,14 @@ ships to both.
      user-connected Exa with no change on our side, and still runs and states the gap
      without one. The answer carries to Claude, where Exa is a connector the user
      connects from the plugin's Connectors tab.
-- **Wayback fix (written 2026-10-06, needs a rerun).** Run 3 sent Wayback and the boards
+- **Wayback fix, revised 2026-10-11 (needs the rerun).** The availability API turned out
+  unreliable: on 2026-10-11 it returned an empty `archived_snapshots` for zeroclick.ai on
+  every form tried (apex, www, https), while answering for vercel.com and linear.app, and
+  while the captures plainly existed. A dated `id_` fetch
+  (`/web/<YYYYMMDD>id_/https://<domain>/`) redirected to the nearest capture in 0.3–0.5 s
+  with the timestamp in the redirect URL, matching the 2026-10-06 lookups exactly. `SKILL.md`
+  now fetches by date first; the lookup is a fallback for tools that hide the final URL.
+- **Wayback fix (written 2026-10-06, superseded above).** Run 3 sent Wayback and the boards
   through the in-app browser, which blocked them; Run 4's CDX query timed out. Timed from a
   terminal: CDX 6–12 s, the availability API 1–2 s, an `id_` capture under 1 s. `SKILL.md`
   now (a) dates changes by availability-API lookups about three months apart, then halves
