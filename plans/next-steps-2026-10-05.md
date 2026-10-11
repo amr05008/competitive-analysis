@@ -11,13 +11,81 @@ Close to submittable. In order; items 1–3 block the ChatGPT submission.
    captures (terminal lookups put it at May 20–June 6). Fail with a healthy archive means
    the app's fetch tool, not the archive: bring the exact error. If you take decision 5's
    connector rewrite, make it before this run so one rerun covers both.
-2. **Name** (decision 1). Everything a rename touches is listed there. One commit.
+2. **Rename** to Competitive Analysis (decision 1, decided 2026-10-11): § Rename checklist.
 3. **Developer name** at the upload screen (decision 2), then the remaining submission
    steps: site pages deployed, `build.sh`, zip, upload.
 4. **Decide 3 and 5** (verdict calibration; what makes this stronger than default skills).
    Neither blocks the submission.
 5. **Remaining tests** under Testing still to do.
 6. **Claude fast follow** once ChatGPT is submitted.
+
+## Rename checklist (written 2026-10-11)
+
+Plugin "Competitive Analysis", plugin id `competitive-analysis`, skill id `teardown`. The
+private `competitive-analysis` skill doesn't change. The icon and logo have no wordmark, so
+they stay. Nothing outside this repo, the site branch, `marketplace.json` and the
+`~/repos` symlink uses the old name (checked `claude-channels`, the vault, `~/.agents`).
+Plans and session logs keep the old name as history.
+
+Order matters: a Claude Code session started here runs inside
+`~/.codex/plugins/worry-or-not`, so the directory move (D) goes last, at the end of a
+session, and the next session starts from the new path.
+
+**A. This repo (one commit)** — done 2026-10-11
+
+1. `plugin.json`: `name` → `competitive-analysis`; `displayName` → `Competitive Analysis`;
+   `homepage` and `websiteURL` → `https://aaronroy.com/competitive-analysis/`;
+   `privacyPolicyURL` and `termsOfServiceURL` → `…/competitive-analysis/privacy/` and
+   `…/terms/`; `repository` → `https://github.com/amr05008/competitive-analysis`. Leave
+   `shortDescription` and `longDescription` for the listing-copy step.
+2. `git mv skills/worry-or-not skills/teardown`. In `SKILL.md`: frontmatter `name: teardown`,
+   H1 `# Teardown`. "Should we worry about" stays in the description and body: it's a
+   trigger phrase, not the name.
+3. `scripts/build.sh`: output path → `skills/teardown/references/report-template.md`. Run it;
+   expect no diff.
+4. `README.md`: title, and the three `skills/worry-or-not/` paths.
+5. `CLAUDE.md`: title (drop "working name"), the "named worry-or-not" line, the test loop's
+   `skills/teardown/SKILL.md`, and the paths `~/.codex/plugins/competitive-analysis` and
+   `~/repos/competitive-analysis`.
+6. This plan: the paths in Pick up here and the Claude section. Commit and push.
+
+**B. GitHub**
+
+7. `gh repo rename competitive-analysis -R amr05008/worry-or-not` (the name was free on
+   2026-10-11). GitHub redirects the old URL. Stays private until the submission hour.
+8. `git remote set-url origin https://github.com/amr05008/competitive-analysis.git`.
+
+**C. aaronroy.com, branch `worry-or-not-pages`**
+
+9. Bring the branch up to date with `main`, which has moved since the branch was cut.
+10. `git mv src/pages/worry-or-not src/pages/competitive-analysis`. Replace "Worry Or Not" in
+    the titles, H1s, body copy and both `mailto:` subjects. The index page's "the
+    competitive-analysis skill I run in Claude Code" now reads like the plugin's own name;
+    reword it (e.g. "my private version of this skill").
+11. Links: `/worry-or-not/privacy/` and `/terms/` in `index.astro` → `/competitive-analysis/…`;
+    the terms page's `https://github.com/amr05008/worry-or-not` → the new repo URL.
+12. `astro.config.mjs`: the three `/worry-or-not/` URLs in `LASTMOD_EXEMPT` and the noindex
+    list.
+13. Don't merge yet. The pages go live with the repo flip, just before upload (Submission
+    steps).
+
+**D. This machine (last, at the end of a session)**
+
+14. In the app: uninstall the Worry Or Not plugin, then quit (Cmd+Q).
+15. `mv ~/.codex/plugins/worry-or-not ~/.codex/plugins/competitive-analysis`;
+    `rm ~/repos/worry-or-not`;
+    `ln -s ~/.codex/plugins/competitive-analysis ~/repos/competitive-analysis`.
+16. `~/.agents/plugins/marketplace.json`: the plugin's `name` → `competitive-analysis`, its
+    `path` → `./.codex/plugins/competitive-analysis`.
+17. Reopen the app → Plugins → "Aaron's local plugins" → install Competitive Analysis. Run the
+    ZeroClick prompt once: the report should look the same, and the skill that fires should
+    be `teardown`, not the private `competitive-analysis`.
+18. Start the next Claude Code session from `~/.codex/plugins/competitive-analysis`. Its
+    history starts fresh; earlier sessions stay under the old path.
+
+**E. Before upload**
+
+19. Search the app's Plugins directory for "Competitive Analysis".
 
 ## Sequencing (decided 2026-10-05)
 
@@ -93,11 +161,13 @@ ships to both.
 
 ## Open decisions
 
-1. **Name.** "Worry Or Not" is provisional. Renaming touches: `plugin.json` (`name`,
-   `displayName`), `skills/<dir>/` and its frontmatter `name`, `~/.agents/plugins/marketplace.json`,
-   this directory's path (and the symlink), the three aaronroy.com pages and their URLs,
-   and the GitHub repo name. One commit, one app restart. Settle it before the Claude
-   manifest exists, so that one starts with the final name.
+1. **Name.** Decided 2026-10-11: **Competitive Analysis** (plugin id `competitive-analysis`).
+   It's how people search, and it matches the plain names in `openai/plugins`. The subtitle
+   carries the differentiator. Skill id inside the plugin: **`teardown`** (decided
+   2026-10-11). It keeps clear of the private `competitive-analysis` skill, which stays as it
+   is so `/competitive-analysis` keeps opening the richer private version; in Claude the
+   plugin's skill reads `/competitive-analysis:teardown`. Steps: § Rename checklist. Do it
+   before the Claude manifest exists, so that one starts with the final name.
 2. **Developer name** must match the verified identity exactly. Verification cleared
    2026-10-06 and the organization name is "Aaron Roy", which is what
    `extensions.com.openai.interface.developerName` already says. Still to confirm: the name
@@ -239,7 +309,7 @@ Researched 2026-10-05 against claude.com/docs. Why it's worth doing:
   `competitive-intelligence` (landscape plan § 5). Neither does Wayback history or per-claim
   labels.
 
-Carries over unchanged: `skills/worry-or-not/` (Agent Skills format, which both hosts read),
+Carries over unchanged: `skills/teardown/` (Agent Skills format, which both hosts read),
 `assets/`, the generated report template.
 
 1. **Fetch test first, in claude.ai chat.** The same test that settled the container on

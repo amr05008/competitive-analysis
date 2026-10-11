@@ -1,20 +1,23 @@
-# Worry Or Not (working name) — repo notes for agents
+# Competitive Analysis — repo notes for agents
 
-A skills-only ChatGPT/Codex plugin that packages the `competitive-analysis` method. Claude
-is the fast follow: the same package with one added manifest, after the ChatGPT
-submission. The name is provisional. Start at § Pick up here in
-`plans/next-steps-2026-10-05.md`, and read it before changing anything named
-"worry-or-not".
+A skills-only ChatGPT/Codex plugin: **Competitive Analysis**, plugin id
+`competitive-analysis`, one skill with id `teardown`. It packages the method of Aaron's
+private `competitive-analysis` skill. The two are separate skills, and the private one keeps
+its name, so `/competitive-analysis` on Aaron's machines still opens the private version.
+Claude is the fast follow: the same package with one added manifest, after the ChatGPT
+submission. Start at § Pick up here in `plans/next-steps-2026-10-05.md`. Formerly "Worry Or
+Not" (renamed 2026-10-11); plans and session logs keep the old name as history.
 
 ## Where things live
 
-- This checkout is at `~/.codex/plugins/worry-or-not` **on purpose**: the ChatGPT desktop
-  app's personal marketplace (`~/.agents/plugins/marketplace.json`) resolves plugin paths
-  relative to the home folder and will not follow symlinks. `~/repos/worry-or-not` is a
-  symlink here. Do not move the directory without updating `marketplace.json`.
+- This checkout is at `~/.codex/plugins/competitive-analysis` **on purpose**: the ChatGPT
+  desktop app's personal marketplace (`~/.agents/plugins/marketplace.json`) resolves plugin
+  paths relative to the home folder and will not follow symlinks.
+  `~/repos/competitive-analysis` is a symlink here. Do not move the directory without
+  updating `marketplace.json`.
 - The method's source of truth is the `competitive-analysis` skill in the private
   `claude-channels` repo, mirrored publicly to `amr05008/agent-skills`.
-  `skills/worry-or-not/references/report-template.md` is **generated** by
+  `skills/teardown/references/report-template.md` is **generated** by
   `scripts/build.sh` from the agent-skills checkout. Never edit it here.
 - Background and decisions: `claude-channels/plans/worry-or-not-2026-10-05.md` and
   `claude-channels/plans/competitive-research-plugin-landscape-2026-10-05.md`.
@@ -32,7 +35,7 @@ submission. The name is provisional. Start at § Pick up here in
 
 ## Test loop
 
-1. Edit `skills/worry-or-not/SKILL.md`.
+1. Edit `skills/teardown/SKILL.md`.
 2. Quit the ChatGPT desktop app (Cmd+Q), reopen, Plugins → "Aaron's local plugins" →
    reinstall if offered.
 3. New chat, no @-mention: `Should we worry about ZeroClick? zeroclick.ai`. Runs so far are

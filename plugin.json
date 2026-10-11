@@ -1,26 +1,26 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-  "name": "worry-or-not",
+  "name": "competitive-analysis",
   "version": "0.1.0",
   "description": "Evidence-graded teardown of one company: positioning history, job-listing mining, contradictions, absence as evidence, and a label on every claim.",
   "author": { "name": "Aaron Roy", "url": "https://aaronroy.com" },
-  "homepage": "https://aaronroy.com/worry-or-not/",
-  "repository": "https://github.com/amr05008/worry-or-not",
+  "homepage": "https://aaronroy.com/competitive-analysis/",
+  "repository": "https://github.com/amr05008/competitive-analysis",
   "license": "MIT",
   "keywords": ["competitive-analysis", "teardown", "due-diligence", "competitor-research", "market-research"],
   "skills": "./skills/",
   "extensions": {
     "com.openai": {
       "interface": {
-        "displayName": "Worry Or Not",
+        "displayName": "Competitive Analysis",
         "shortDescription": "Evidence-graded teardowns",
         "longDescription": "Ask whether to worry about a company and get a teardown where every claim carries a link, a date, and a VERIFIED / COMPANY-CLAIMED / ESTIMATE label. It reconstructs positioning history from the Wayback Machine, mines job listings for what they are actually building, reconciles contradictions between sources, and treats silence as evidence. Ends with one of four verdicts and the variables that decide it. Connect your own Exa or Firecrawl plugin for richer search; without one it runs on built-in browsing and states its gaps.",
         "developerName": "Aaron Roy",
         "category": "Research",
         "capabilities": ["Read"],
-        "websiteURL": "https://aaronroy.com/worry-or-not/",
-        "privacyPolicyURL": "https://aaronroy.com/worry-or-not/privacy/",
-        "termsOfServiceURL": "https://aaronroy.com/worry-or-not/terms/",
+        "websiteURL": "https://aaronroy.com/competitive-analysis/",
+        "privacyPolicyURL": "https://aaronroy.com/competitive-analysis/privacy/",
+        "termsOfServiceURL": "https://aaronroy.com/competitive-analysis/terms/",
         "defaultPrompt": [
           "Should we worry about <company>?",
           "Teardown of <company> for our roadmap",

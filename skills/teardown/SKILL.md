@@ -1,9 +1,9 @@
 ---
-name: worry-or-not
+name: teardown
 description: Use when someone asks "should we worry about <company>", wants a competitive teardown, competitor research, diligence on a company or product, or asks what a landing page signals. Produces an evidence-graded teardown of one company. Every material claim carries a link, an evidence date, and a VERIFIED / COMPANY-CLAIMED / ESTIMATE label. Four methods are required: positioning history from the Wayback Machine, job-listing mining, contradiction reconciliation, and absence as evidence.
 ---
 
-# Worry Or Not
+# Teardown
 
 A teardown of one company, graded by evidence. The question is usually "should we worry about them." The answer is one of four verdicts, defended by the few variables that decide it, with every material claim labeled by where it came from.
 

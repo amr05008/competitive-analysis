@@ -1,4 +1,4 @@
-# Worry Or Not
+# Competitive Analysis
 
 A ChatGPT and Codex plugin that produces an evidence-graded teardown of one company.
 The method comes from the `competitive-analysis` skill in
@@ -9,11 +9,11 @@ submission.
 ## Layout
 
 - `plugin.json`: the portable manifest.
-- `skills/worry-or-not/SKILL.md`: the method, written for a model with a browser and
+- `skills/teardown/SKILL.md`: the method, written for a model with a browser and
   whatever plugins the user connected.
-- `skills/worry-or-not/references/report-template.md`: **generated** by
+- `skills/teardown/references/report-template.md`: **generated** by
   `scripts/build.sh` from agent-skills; the report contract has one source.
-- `skills/worry-or-not/agents/openai.yaml`: optional tool dependencies.
+- `skills/teardown/agents/openai.yaml`: optional tool dependencies.
 - `assets/`: icon and logo.
 - `LICENSE`: MIT. Ships in the zip.
 
@@ -29,5 +29,6 @@ See `plans/next-steps-2026-10-05.md` for state, open decisions, and remaining te
       the skill without a mention; labels present; pivot dated. Run 2, 2026-10-05.
 - [ ] Wayback rerun with the date-lookup method dates the ZeroClick pivot from captures
       (Exa off). Run 5 was inconclusive: archive.org was down.
-- [ ] `sh scripts/build.sh` run against a fresh `agent-skills` pull.
+- [x] `sh scripts/build.sh` run against a fresh `agent-skills` pull. 2026-10-11, agent-skills@2f3a16a,
+      no change. Rerun if agent-skills moves before upload.
 - [ ] Zip the repo root (`plugin.json`, `LICENSE`, `skills/`, `assets/`), no `.git`, no `scripts/`.
