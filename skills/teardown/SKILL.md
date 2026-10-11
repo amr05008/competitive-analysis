@@ -65,11 +65,13 @@ https://archive.org/wayback/available?url=<domain>/<path>&timestamp=<YYYYMMDD>
 
 The lookup sometimes answers with an empty `archived_snapshots` even when captures exist, so an empty answer there is not evidence that none exist.
 
-1. Read the live page, then the captures nearest dates about three months apart, going back 24 months. Compare the title and headline copy.
+1. Read the live page, then the captures nearest dates about six months apart, going back 24 months. Compare the title and headline copy.
 2. Where the copy differs between two neighboring captures, fetch the date halfway between and read it. Keep halving until the last capture with the old copy and the first with the new are about two weeks apart, or no capture lies between them. That pair brackets the change.
 3. Do the homepage and the pricing page at minimum. For pricing, read the captures at both ends of the window and on either side of the homepage's change points, and narrow only where pricing changed.
 
-If a capture's body is unrecoverable (some pages render only with scripts), compare its `<title>`, or fetch a date a week away. If a fetch fails, retry once, then try a date a week away; if that fails too, record the gap with the exact status or error. These URLs are public, need no key, and usually answer within a second or two, so fetch them before calling any of them blocked.
+Fetch archive URLs one at a time, never in parallel, and keep to about ten per teardown. The archive rate-limits, and a burst gets the fetcher's connection refused for several minutes. A "connection refused" from the archive is that limit, not an outage: don't retry it or try nearby dates straight away. Stop narrowing, report the bracket you have, and name the refusal in the coverage gaps.
+
+If a capture's body is unrecoverable (some pages render only with scripts), compare its `<title>`, or fetch a date a week away. If a fetch fails for any other reason, retry once, then try a date a week away; if that fails too, record the gap with the exact status or error. These URLs are public, need no key, and usually answer within a second or two, so fetch them before calling any of them blocked.
 
 The evidence date is the timestamp of the capture served, from the URL you ended up at or from the lookup, never the date you asked for: Wayback answers with the nearest capture it has. Removed or hidden pricing is a finding. Announcement dates are when the company said something; capture dates are when the site changed. Report both when they differ, and date a pivot by the site.
 

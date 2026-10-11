@@ -4,7 +4,11 @@
 
 Close to submittable. In order; items 1–3 block the ChatGPT submission.
 
-1. **Wayback rerun, combined with rename step 17.** First check archive.org is up: open
+1. ~~**Wayback rerun, combined with rename step 17.**~~ Done 2026-10-11, Runs 6–7 (see
+   State): new phrasings trigger, the renamed plugin installs and fires, the pivot is dated
+   from captures. Brackets stayed wide because the archive refused connections mid-run; the
+   pacing rule added after it is untested and rides on the Vercel run (Testing).
+   Original text: First check archive.org is up: open
    `https://web.archive.org/web/20260601id_/https://zeroclick.ai/` in a browser; a page
    within a couple of seconds means go. Then reinstall the plugin, new Codex chat, Exa off,
    `Should we worry about ZeroClick? zeroclick.ai`. Pass: the `teardown` skill fires, and
@@ -136,6 +140,22 @@ ships to both.
     app won't prompt for it. Cost: $0.05 of Exa credit for the whole teardown ($20.00 →
     $19.95).
   - **Wayback is the weak point:** site-dated pivot in 1 of 4 runs (Run 2 only).
+  - Runs 6–7 (renamed plugin, new description, dated-fetch Wayback, Exa off, private skill
+    parked, 2026-10-11). Run 6, `Competitive analysis of ZeroClick, zeroclick.ai`:
+    https://chatgpt.com/s/cx_6acbc98a4e44819193310d5d9b0aaebe — Run 7, `Teardown of
+    ZeroClick and its landing page`:
+    https://chatgpt.com/s/cx_6acbc9b638c48191933cd9dff261624a. **Both phrasings triggered
+    the skill.** **Pivot dated from captures in both** (VERIFIED ad-network captures Oct 13,
+    2025 / Jan 19, 2026 against a June 14 agent-commerce capture, and the catch that the
+    site changed before the July 21 announcement), but the brackets stayed wide: several
+    archive fetches got "connection refused", most likely the archive's rate limit on the
+    app's fetcher after a burst of requests. The availability lookup came back empty, as in
+    the terminal. Run 7 added a landing-page critique table on top of the teardown; Run 6
+    caught that the domain belonged to a different business in July 2025 and kept it out.
+    Boards: 404s (Ashby 403 in Run 6). Verdict "promising but unproven" in both (decision 3).
+    Follow-up: `SKILL.md` now spaces probes six months apart, fetches archive URLs one at a
+    time, caps them near ten, and treats "connection refused" as the rate limit (stop
+    narrowing, report the bracket). Untested.
   - Run 5 / Wayback fix, Exa off (2026-10-06):
     https://chatgpt.com/s/cx_6ac5b148f8748191a6650b4addd40540 — **tool routing fixed** (Run
     row: "page reads, direct public-page fetches", no browser). **Wayback inconclusive:**
@@ -254,7 +274,8 @@ ships to both.
   reports Codex. A chat run's share link is `chatgpt.com/share/...`, not `/s/cx_...`. If a
   locally installed plugin only loads in Codex, this test waits until after submission.
 - **A second company** with a real job board (Greenhouse or Ashby) so method 2 runs for
-  real. Candidates with public boards verified today: Vercel (Greenhouse), Linear (Ashby),
+  real. Use Vercel (Greenhouse): Ashby has answered the app's fetcher with 403. This run
+  also tests the Wayback pacing rule on a site with a long archive. Candidates with public boards verified today: Vercel (Greenhouse), Linear (Ashby),
   Ramp (Ashby).
 - **Strategic-direction mode:** one run with a specific page URL as the subject.
 - **Trigger test.** Description rewritten 2026-10-11 to lead with the ways people ask

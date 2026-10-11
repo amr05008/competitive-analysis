@@ -27,8 +27,8 @@ See `plans/next-steps-2026-10-05.md` for state, open decisions, and remaining te
 - [x] `assets/icon-small.svg` and `assets/logo.png` exist.
 - [x] Installed from a local marketplace; "should we worry about ZeroClick" triggers
       the skill without a mention; labels present; pivot dated. Run 2, 2026-10-05.
-- [ ] Wayback rerun with the date-lookup method dates the ZeroClick pivot from captures
-      (Exa off). Run 5 was inconclusive: archive.org was down.
+- [x] Wayback rerun dates the ZeroClick pivot from captures (Exa off). Runs 6–7,
+      2026-10-11: dated, but bracket wide (archive refused connections mid-run).
 - [x] `sh scripts/build.sh` run against a fresh `agent-skills` pull. 2026-10-11, agent-skills@2f3a16a,
       no change. Rerun if agent-skills moves before upload.
 - [ ] Zip the repo root (`plugin.json`, `LICENSE`, `skills/`, `assets/`), no `.git`, no `scripts/`.
