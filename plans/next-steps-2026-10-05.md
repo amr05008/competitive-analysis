@@ -321,6 +321,11 @@ Chrome (Claude in Chrome) and read the page text.
 Share links are public to anyone with the URL, signed in or not, and archiving the chat
 doesn't change that (checked 2026-10-11 from a signed-out browser on Runs 6 and 7). Check
 the prompt line at the top of a shared run for an "@" before scoring it as a trigger test.
+**All share links were deleted 2026-10-11** (checked signed-out: Runs 2, 6, 7 and the
+baseline all return "not found"). Every share URL in this plan is now dead; the chats
+themselves stay in the app's history. Re-share only what the write-up needs (the no-plugin
+baseline is its "before" picture). From now on, paste report text into the session instead
+of sharing, especially for Manychat runs.
 
 ## Submission steps (when ready)
 
