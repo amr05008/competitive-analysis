@@ -22,9 +22,9 @@
         "privacyPolicyURL": "https://aaronroy.com/competitive-analysis/privacy/",
         "termsOfServiceURL": "https://aaronroy.com/competitive-analysis/terms/",
         "defaultPrompt": [
-          "Should we worry about <company>?",
-          "Teardown of <company> for our roadmap",
-          "What does this new pricing page signal? <url>"
+          "Competitive analysis of <company>",
+          "Teardown of <company> and its landing page",
+          "What does this pricing page signal? <url>"
         ],
         "brandColor": "#1F6F5F",
         "composerIcon": "./assets/icon-small.svg",

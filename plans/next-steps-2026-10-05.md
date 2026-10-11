@@ -257,8 +257,17 @@ ships to both.
   real. Candidates with public boards verified today: Vercel (Greenhouse), Linear (Ashby),
   Ramp (Ashby).
 - **Strategic-direction mode:** one run with a specific page URL as the subject.
-- **Trigger test:** does "teardown of X" and "competitor research on X" fire the skill
-  without a mention?
+- **Trigger test.** Description rewritten 2026-10-11 to lead with the ways people ask
+  ("analyze this company", "teardown of X", "competitive analysis of X", "research this
+  competitor"; "should we worry" is now one example), plus a not-for line (stock picks,
+  investment advice, financial statements, people). Check each phrase fires `teardown`
+  without a mention, and that "analyze Apple's 10-K" does not. On this machine, park the
+  private skill first (`mv ~/.agents/skills/competitive-analysis
+  ~/.agents/competitive-analysis.parked`, and back afterwards): its description overlaps,
+  and the app reads `~/.agents/skills`.
+- **Listing copy still says "worry":** `longDescription` in `plugin.json` ("Ask whether to
+  worry about a company") and the site page ("Ask it 'should we worry about company?'").
+  Reword in the listing-copy step.
 - **Length and truncation** of the full report on request.
 - **Directory collision check:** search the Plugins directory in the app for the chosen
   name before submitting.

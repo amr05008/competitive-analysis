@@ -1,11 +1,11 @@
 ---
 name: teardown
-description: Use when someone asks "should we worry about <company>", wants a competitive teardown, competitor research, diligence on a company or product, or asks what a landing page signals. Produces an evidence-graded teardown of one company. Every material claim carries a link, an evidence date, and a VERIFIED / COMPANY-CLAIMED / ESTIMATE label. Four methods are required: positioning history from the Wayback Machine, job-listing mining, contradiction reconciliation, and absence as evidence.
+description: Use when someone wants a competitive analysis or teardown of one company or product, in any phrasing, such as "analyze this company", "teardown of <company>", "competitive analysis of <company>", "research this competitor", "should we worry about <company>", or diligence on a company. Also when they ask what one landing page or pricing page signals. Produces an evidence-graded teardown where every material claim carries a link, an evidence date, and a VERIFIED / COMPANY-CLAIMED / ESTIMATE label. Four methods are required (positioning history from the Wayback Machine, job-listing mining, contradiction reconciliation, absence as evidence). Not for stock picks, investment advice, financial-statement analysis, or researching a person.
 ---
 
 # Teardown
 
-A teardown of one company, graded by evidence. The question is usually "should we worry about them." The answer is one of four verdicts, defended by the few variables that decide it, with every material claim labeled by where it came from.
+A teardown of one company, graded by evidence. The ask comes in many forms ("analyze this company", "teardown of X", "should we worry about them"); the answer is always one of four verdicts, defended by the few variables that decide it, with every material claim labeled by where it came from.
 
 Read `references/report-template.md` first. It is the report contract: header, structure, evidence labels, verdict definitions. It was written for a file-based harness; the **Adaptations** section below says which of its rows do not apply here.
 
