@@ -144,8 +144,9 @@ ships to both.
     parked, 2026-10-11). Run 6, `Competitive analysis of ZeroClick, zeroclick.ai`:
     https://chatgpt.com/s/cx_6acbc98a4e44819193310d5d9b0aaebe — Run 7, `Teardown of
     ZeroClick and its landing page`:
-    https://chatgpt.com/s/cx_6acbc9b638c48191933cd9dff261624a. **Both phrasings triggered
-    the skill.** **Pivot dated from captures in both** (VERIFIED ad-network captures Oct 13,
+    https://chatgpt.com/s/cx_6acbc9b638c48191933cd9dff261624a. **Run 7 triggered without a
+    mention; Run 6's prompt began with "@Competitive Analysis"**, so the "competitive
+    analysis of X" phrasing is still untested as a trigger. **Pivot dated from captures in both** (VERIFIED ad-network captures Oct 13,
     2025 / Jan 19, 2026 against a June 14 agent-commerce capture, and the catch that the
     site changed before the July 21 announcement), but the brackets stayed wide: several
     archive fetches got "connection refused", most likely the archive's rate limit on the
@@ -278,7 +279,8 @@ ships to both.
   also tests the Wayback pacing rule on a site with a long archive. Candidates with public boards verified today: Vercel (Greenhouse), Linear (Ashby),
   Ramp (Ashby).
 - **Strategic-direction mode:** one run with a specific page URL as the subject.
-- **Trigger test.** Description rewritten 2026-10-11 to lead with the ways people ask
+- **Trigger test** ("teardown of X and its landing page" passed in Run 7; "competitive
+  analysis of X" still to do without the @-mention). Description rewritten 2026-10-11 to lead with the ways people ask
   ("analyze this company", "teardown of X", "competitive analysis of X", "research this
   competitor"; "should we worry" is now one example), plus a not-for line (stock picks,
   investment advice, financial statements, people). Check each phrase fires `teardown`
@@ -316,6 +318,9 @@ challenged"; pivot May–June 2026 (terminal lookups 2026-10-06: May 20–June 6
 
 Reading share links: `chatgpt.com/s/cx_...` returns 403 to WebFetch and curl. Open it in
 Chrome (Claude in Chrome) and read the page text.
+Share links are public to anyone with the URL, signed in or not, and archiving the chat
+doesn't change that (checked 2026-10-11 from a signed-out browser on Runs 6 and 7). Check
+the prompt line at the top of a shared run for an "@" before scoring it as a trigger test.
 
 ## Submission steps (when ready)
 
