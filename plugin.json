@@ -14,7 +14,7 @@
       "interface": {
         "displayName": "Competitive Analysis",
         "shortDescription": "Evidence-graded teardowns",
-        "longDescription": "Ask whether to worry about a company and get a teardown where every claim carries a link, a date, and a VERIFIED / COMPANY-CLAIMED / ESTIMATE label. It reconstructs positioning history from the Wayback Machine, mines job listings for what they are actually building, reconciles contradictions between sources, and treats silence as evidence. Ends with one of four verdicts and the variables that decide it. Connect your own Exa or Firecrawl plugin for richer search; without one it runs on built-in browsing and states its gaps.",
+        "longDescription": "Name a company and get a teardown where every claim carries a link, a date, and a VERIFIED / COMPANY-CLAIMED / ESTIMATE label. It dates changes in positioning and pricing from Wayback Machine captures, reads the company's own job listings for what it's actually building, reconciles sources that disagree, and treats silence as evidence. It ends with one of four verdicts and the two or three variables that decide it. Built for founders, product people and operators sizing up a competitor, a partner or a market. Connect your own Exa or Firecrawl for richer search and page text, and your own Clay for company data such as headcount history. Without them it runs on built-in browsing and says where that left gaps. It researches companies, not people, and isn't for stock picks or investment advice.",
         "developerName": "Aaron Roy",
         "category": "Research",
         "capabilities": ["Read"],

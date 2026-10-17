@@ -1,27 +1,32 @@
 # Next steps for the plugin (written 2026-10-05, end of day)
 
-## Pick up here (updated 2026-10-06, end of night)
+## Pick up here (updated 2026-10-17)
 
-Close to submittable. In order; items 1–3 block the ChatGPT submission.
+Close to submittable. Items 1–2 block the ChatGPT submission.
 
-1. ~~**Wayback rerun, combined with rename step 17.**~~ Done 2026-10-11, Runs 6–7 (see
-   State): new phrasings trigger, the renamed plugin installs and fires, the pivot is dated
-   from captures. Brackets stayed wide because the archive refused connections mid-run; the
-   pacing rule added after it is untested and rides on the Vercel run (Testing).
-   Original text: First check archive.org is up: open
-   `https://web.archive.org/web/20260601id_/https://zeroclick.ai/` in a browser; a page
-   within a couple of seconds means go. Then reinstall the plugin, new Codex chat, Exa off,
-   `Should we worry about ZeroClick? zeroclick.ai`. Pass: the `teardown` skill fires, and
-   the pivot is bracketed from captures (terminal fetches put it at May 20–June 6). Fail
-   with the archive up means the app's fetch tool: bring the exact error. If you take
-   decision 5's connector rewrite, make it before this run so one rerun covers both.
-2. **Rename** to Competitive Analysis (decision 1, decided 2026-10-11): § Rename checklist.
-3. **Developer name** at the upload screen (decision 2), then the remaining submission
-   steps: site pages deployed, `build.sh`, zip, upload.
-4. **Decide 3 and 5** (verdict calibration; what makes this stronger than default skills).
-   Neither blocks the submission.
-5. **Remaining tests** under Testing still to do.
-6. **Claude fast follow** once ChatGPT is submitted.
+1. **Clay run in the app** (decision 5, decided 2026-10-17). Connect Clay in ChatGPT,
+   reinstall the plugin, new Codex chat, no @-mention:
+   `Competitive analysis of ZeroClick, zeroclick.ai`. Pass: the headcount trend appears,
+   labeled ESTIMATE with Clay named and set against the pivot dates; Clay is in the Run
+   row; no Clay people or contact tools are called; Clay's investor list (partner logos)
+   is not repeated as investors. It doubles as the "competitive analysis of X" trigger
+   test. Paste the report text into the session; don't share it.
+2. **Developer name** at the upload screen (decision 2), then the remaining submission
+   steps: site pages deployed, zip, upload. `build.sh`: agent-skills unchanged since
+   `2f3a16a` as of 2026-10-17, so no rerun needed unless it moves.
+3. **Remaining tests** under Testing. None blocks.
+4. **Decide 3** (verdict calibration). Doesn't block.
+5. **Claude fast follow** once ChatGPT is submitted.
+
+Done: Wayback rerun (Runs 6–7, 2026-10-11), rename (§ Rename checklist), listing copy
+(2026-10-17).
+
+**Updating after submission** (checked 2026-10-17 against
+developers.openai.com/plugins/deploy/submission): upload a new ZIP to the existing plugin
+with a new version number. Each version gets its own checks and review, only one review
+can be active per plugin, and publishing replaces the live version. "Adding an MCP server
+to an existing skills-only plugin is not currently supported", so anything server-shaped
+goes in v1 or not at all.
 
 ## Rename checklist (written 2026-10-11)
 
@@ -208,7 +213,19 @@ ships to both.
    Claude port doesn't cost a second ChatGPT review. Confirmed by Run 3: the reworded
    skill loaded and the report kept its shape.
 5. **What makes this stronger than default competitive-analysis skills** (raised
-   2026-10-06; proposed, not decided).
+   2026-10-06; connector half decided 2026-10-17, head-to-head still open).
+   - **Decided 2026-10-17: capability slots in v1, with Clay as the company-data tool, and
+     no vendor names in `SKILL.md`.** Aaron's private skill runs on Clay. Why no names:
+     OpenAI's plugin guidelines (Fair play) bar model-readable text "that manipulate[s] how
+     the model selects or uses other plugins... (for example, instructing the model to
+     prefer one plugin over others)". Vendor names now live in the listing copy and on
+     the site, which are written for people. The company-data slot asks for two things,
+     headcount with its trend and the latest funding round, and labels the headcount
+     ESTIMATE with the tool named. Its funding figure is a lead to confirm from press.
+     There are no people or contact tools and no research agents. `agents/openai.yaml`
+     still declares only Exa: Run 3 showed it causes no connect prompt, and Clay's MCP URL
+     isn't documented by Clay. Flippable: name vendors as examples in `SKILL.md` if the
+     in-app run shows the model misses a connected tool without the name.
    - **Connectors: one generic rule, not vendor branches.** Rewrite the Tools section as
      capability slots: search and page text (Exa, Firecrawl); company data such as
      headcount history and funding (Clay, Harmonic, Crunchbase); community sentiment (Monid
@@ -296,9 +313,21 @@ ships to both.
   private skill first (`mv ~/.agents/skills/competitive-analysis
   ~/.agents/competitive-analysis.parked`, and back afterwards): its description overlaps,
   and the app reads `~/.agents/skills`.
-- **Listing copy still says "worry":** `longDescription` in `plugin.json` ("Ask whether to
-  worry about a company") and the site page ("Ask it 'should we worry about company?'").
-  Reword in the listing-copy step.
+- ~~**Listing copy still says "worry"**~~: done 2026-10-17. `longDescription` reworded
+  and Clay added, with the intended users and limits that the description field asks
+  for. Site pages are on branch `worry-or-not-pages`.
+- **Clay wording, dry runs 2026-10-17.** Plan-only, no credits spent: Claude subagents got
+  the skill, a simulated Clay app (its real tool list and descriptions) and fixed results
+  taken from the reference teardown, then the ZeroClick prompt. Five ran on the old
+  wording, five on the new. Old: no contact tools in 5/5 and press over Clay's investor
+  list in 5/5. But they requested anywhere from 1 to 6 Clay data points, and 3/5 said the
+  skill has no label for provider data; one read "if you cannot reach the page, the figure
+  does not go in" as dropping the headcount. New: 5/5 requested exactly Headcount Growth +
+  Latest Funding, checked the record against the domain's earlier owner before spending,
+  labeled headcount "ESTIMATE, third-party headcount data from Clay; count lags", set it
+  against the pivot, and named Clay in the Run row. Quirk: several logged "series covers
+  9 of 24 months" as a gap. Harmless, left in. The host model in the app differs, so
+  the in-app run (Pick up here 1) is the real test.
 - **Length and truncation** of the full report on request.
 - **Directory collision check:** search the Plugins directory in the app for the chosen
   name before submitting.
@@ -315,7 +344,8 @@ Checklist (from `claude-channels/plans/worry-or-not-2026-10-05.md` step 5, exten
 - Pivot dated by site captures, not only by the announcement.
 - Funding present; hiring present, or the boards correctly reported as not found / blocked
   with the status.
-- Connected tools used and named in the Run row.
+- Connected tools used and named in the Run row. A company-data tool's company tools
+  only: no people or contact lookups.
 - Coverage gaps split into not found / blocked / no connector, with exact errors.
 
 Reference: the Claude Code teardown,

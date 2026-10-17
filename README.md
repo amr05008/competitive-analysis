@@ -31,4 +31,7 @@ See `plans/next-steps-2026-10-05.md` for state, open decisions, and remaining te
       2026-10-11: dated, but bracket wide (archive refused connections mid-run).
 - [x] `sh scripts/build.sh` run against a fresh `agent-skills` pull. 2026-10-11, agent-skills@2f3a16a,
       no change. Rerun if agent-skills moves before upload.
+- [x] Listing copy: `longDescription` reworded (no "worry"), Clay added. 2026-10-17.
+- [ ] Clay run in the app: ZeroClick with Clay connected. Headcount labeled ESTIMATE with
+      Clay named, Clay in the Run row, no Clay contact tools called.
 - [ ] Zip the repo root (`plugin.json`, `LICENSE`, `skills/`, `assets/`), no `.git`, no `scripts/`.
