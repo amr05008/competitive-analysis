@@ -5,11 +5,12 @@
 Close to submittable. Item 2 blocks the ChatGPT submission; 1a is optional.
 
 1. ~~**Clay run in the app**~~ Passed 2026-10-17 in Run 10 (State).
-1a. **Exa-off control** (optional, about 3 minutes): Clay on, Exa off, same prompt. If
-   the boards return statuses and Wayback dates the pivot, Exa's fetch is the cause.
-   Then decide whether the listing copy should keep suggesting Exa, since its search
-   finds more while its fetch costs the two free methods. If they still fail, the
-   problem is the app's fetch today, not Exa.
+1a. ~~**Exa-off control**~~ Done, Run 11: Exa's fetch is the cause.
+1b. **Routing rerun:** Clay and Exa on, same prompt. Pass: the Run row or tool list shows
+   the app's own fetch on the Wayback and board URLs; boards return HTTP 404; the pivot
+   is bracketed from captures; Exa still does search. If it passes, the listing keeps
+   Exa. If it fails, drop Exa and Firecrawl from `longDescription` and the site page
+   (keep Clay), and submit anyway.
    Original item 1 text: **Clay run in the app** (decision 5, decided 2026-10-17). First pass is Run 9
    (State): labels, Run row, funding, trigger, and no contact tools in the visible log
    pass; the cross-check failed. Two fixes are untested (cross-check, crawler codes).
@@ -232,6 +233,20 @@ ships to both.
     (5–7) and dated it (6–7). Best competitive set yet (Nevermined 1–2%, Coinbase x402
     facilitator pricing, Stripe's Agentic Commerce Suite, Product Hunt's seven reviews),
     likely from Exa search. Verdict "promising but unproven" (decision 3).
+  - Run 11 / Exa off, Clay off too (2026-10-17, 6:56, an hour after Runs 9–10; pasted
+    plus screenshot; GPT-6.1 Sol Medium). Run row: "web search, direct public-page
+    fetches, Wayback Machine, job-board APIs". **Pivot bracketed May 20–June 6 from
+    captures**, the same as the terminal lookups (June title-only, body unrecoverable).
+    **Greenhouse, Lever, Ashby and /careers each returned HTTP 404** and were read as "no
+    public board found". Placed under coverage limits, not as an absence finding. Old
+    /pricing captures 404, older homepage capture 403. The gap read "no headcount-history
+    ... connector". New findings: the Ramp partnership (an agent buying DeepAI credits),
+    Locus listing a "ZeroClick Sellers" category, Coinbase Bazaar, Crossmint. Verdict
+    "promising but unproven". **Settles it: Exa's fetch is the cause.** Same day, same
+    app: Exa on got 0 of 3, Exa off got statuses and a capture-dated pivot. Fix: "Fetch
+    URLs directly" now sends the URLs the skill builds through the app's own fetch,
+    which returns the HTTP status. A connected search tool still does search and page
+    reading. No vendor is named. Untested with Exa on.
   - A stray run used the Claude Code skill via Codex (the app reads `~/.agents/skills`):
     https://chatgpt.com/s/cx_6ac4516b7ca48191af87beebdcaf0720. Same trigger phrase; the
     plugin still won on the explicit prompt. Keep in mind when testing.
