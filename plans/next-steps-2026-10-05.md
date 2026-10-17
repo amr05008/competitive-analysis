@@ -2,9 +2,15 @@
 
 ## Pick up here (updated 2026-10-17)
 
-Close to submittable. Items 1–2 block the ChatGPT submission.
+Close to submittable. Item 2 blocks the ChatGPT submission; 1a is optional.
 
-1. **Clay run in the app** (decision 5, decided 2026-10-17). First pass is Run 9
+1. ~~**Clay run in the app**~~ Passed 2026-10-17 in Run 10 (State).
+1a. **Exa-off control** (optional, about 3 minutes): Clay on, Exa off, same prompt. If
+   the boards return statuses and Wayback dates the pivot, Exa's fetch is the cause.
+   Then decide whether the listing copy should keep suggesting Exa, since its search
+   finds more while its fetch costs the two free methods. If they still fail, the
+   problem is the app's fetch today, not Exa.
+   Original item 1 text: **Clay run in the app** (decision 5, decided 2026-10-17). First pass is Run 9
    (State): labels, Run row, funding, trigger, and no contact tools in the visible log
    pass; the cross-check failed. Two fixes are untested (cross-check, crawler codes).
    Rerun with Clay **and Exa on**, the setup the listing copy suggests. Reinstall the
@@ -210,6 +216,22 @@ ships to both.
     1 as step 4, dated by announcement when the site bracket is wide; (2) "Fetch URLs
     directly" now treats a crawler code as a refusal and says to get the status from a
     different fetch tool; only an HTTP 404 means not found.
+  - Run 10 / Clay on, Exa on, both Run 9 fixes (2026-10-17, pasted plus screenshot,
+    not shared), same prompt, no @-mention. `teardown` fired. **Clay passes:** the
+    headcount (35 three months ago, 24 now) is now in the Traction findings, "overlapping
+    the new-product launch period", labeled ESTIMATE with Clay named, plus the lag caveat
+    and a "do not prove layoffs" hedge. Not in the top-five table. The Clay widget showed
+    **two ZeroClick records** (11–50, LA; and 2–10, IT services, Delaware, most likely the
+    domain's earlier owner). It used the right one but didn't mention the second. No
+    Clay investor list; $55M from a founder interview, COMPANY-CLAIMED. **Fetch fix
+    half-worked:** it now tries other fetch methods and names Wayback's codes
+    (CRAWL_NOT_FOUND on pricing captures, timeouts on older homepage captures, empty
+    content in July; alternate fetches "inaccessible"). The boards "failed across fetch
+    methods" with no status or code named. **Exa-on tally:** 0 of 3 runs (4, 9, 10)
+    dated the pivot from captures or got a board status; the Exa-off runs got statuses
+    (5–7) and dated it (6–7). Best competitive set yet (Nevermined 1–2%, Coinbase x402
+    facilitator pricing, Stripe's Agentic Commerce Suite, Product Hunt's seven reviews),
+    likely from Exa search. Verdict "promising but unproven" (decision 3).
   - A stray run used the Claude Code skill via Codex (the app reads `~/.agents/skills`):
     https://chatgpt.com/s/cx_6ac4516b7ca48191af87beebdcaf0720. Same trigger phrase; the
     plugin still won on the explicit prompt. Keep in mind when testing.
