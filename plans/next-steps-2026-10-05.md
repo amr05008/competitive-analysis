@@ -4,8 +4,11 @@
 
 Close to submittable. Items 1–2 block the ChatGPT submission.
 
-1. **Clay run in the app** (decision 5, decided 2026-10-17). Connect Clay in ChatGPT,
-   reinstall the plugin, new Codex chat, no @-mention:
+1. **Clay run in the app** (decision 5, decided 2026-10-17). First pass is Run 9
+   (State): labels, Run row, funding and trigger pass; the cross-check failed, and the fix
+   is untested. Confirm from Run 9's Clay step that no people or contact tools ran, then
+   rerun the same way. Connect Clay in ChatGPT, reinstall the plugin, new Codex chat, no
+   @-mention:
    `Competitive analysis of ZeroClick, zeroclick.ai`. Pass: the headcount trend appears,
    labeled ESTIMATE with Clay named and set against the pivot dates; Clay is in the Run
    row; no Clay people or contact tools are called; Clay's investor list (partner logos)
@@ -175,6 +178,28 @@ ships to both.
     in an order form, against the advertised $0 setup / 5% (a good contradiction catch).
     Note: a degraded archive answers the lookup with an empty result, not an error, so
     "empty" can't be read as "no captures" without a retry.
+  - Run 9 / Clay on, Exa on (2026-10-17, pasted, not shared),
+    `Competitive analysis of ZeroClick, zeroclick.ai`, no @-mention. **`teardown` fired**
+    (no Page row; the evidence key paraphrases the new ESTIMATE definition), so the
+    "competitive analysis of X" trigger passes. Run row: "Codex · Exa, Clay, Wayback, web
+    fetches". **Clay worked as written:** headcount "24 versus 35 three months earlier",
+    ESTIMATE, Clay named, "may lag". No Clay investor list. $55M came from press and was
+    correctly placed as the ad-era raise, not a new round. **Miss:** the drop was not set
+    against the pivot. It sat in an interpretation table ("does not establish layoffs"),
+    though the three-months-ago point is mid-July and the launch post is July 21.
+    **Wayback:** an April 16 ad-era capture against the live site. A July capture came
+    back CRAWL_EMPTY_CONTENT (Exa), then HTTP 429, so the site bracket is April 16 to
+    October 17 and the pivot is dated by announcement only. **Boards:** CRAWL_NOT_FOUND
+    on all three and other fetches "inaccessible". Reported as blocked ("do not establish
+    an absence of hiring"), where Run 4 read the same codes as not found. Verdict
+    "promising but unproven" (decision 3). New findings: Nevermined at 1–2% as the
+    direct comparison, the Bytemine and ActionLayer integrations, the homepage figures
+    being sample dashboard content, ZeroClick making the first purchases itself, and the
+    57% → "one in two" wording slip. Contact-tool check pending: Aaron to read the
+    app's Clay step. Follow-up: the headcount cross-check moved from Tools into method 1
+    as step 4, dated by announcement when the site bracket is wide. Untested. Pattern to
+    watch: both Exa-on runs (4, 9) got crawler codes in place of HTTP statuses on the
+    archive and the boards.
   - A stray run used the Claude Code skill via Codex (the app reads `~/.agents/skills`):
     https://chatgpt.com/s/cx_6ac4516b7ca48191af87beebdcaf0720. Same trigger phrase; the
     plugin still won on the explicit prompt. Keep in mind when testing.
