@@ -1,9 +1,0 @@
-# Dependencies this skill can use when the user has connected them. None is
-# required: a missing one becomes a stated coverage gap in the report.
-dependencies:
-  tools:
-    - type: "mcp"
-      value: "exa"
-      description: "Exa web search and page text; the user's own Exa account"
-      transport: "streamable_http"
-      url: "https://mcp.exa.ai/mcp"

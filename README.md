@@ -13,7 +13,6 @@ submission.
   whatever plugins the user connected.
 - `skills/teardown/references/report-template.md`: **generated** by
   `scripts/build.sh` from agent-skills; the report contract has one source.
-- `skills/teardown/agents/openai.yaml`: optional tool dependencies.
 - `assets/`: icon and logo.
 - `LICENSE`: MIT. Ships in the zip.
 

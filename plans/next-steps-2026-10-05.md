@@ -6,7 +6,9 @@ Close to submittable. Item 2 blocks the ChatGPT submission; 1a is optional.
 
 1. ~~**Clay run in the app**~~ Passed 2026-10-17 in Run 10 (State).
 1a. ~~**Exa-off control**~~ Done, Run 11: Exa's fetch is the cause.
-1b. **Routing rerun:** Clay and Exa on, same prompt. Pass: the Run row or tool list shows
+1b. ~~**Routing rerun**~~ Failed, Run 12. Exa and Firecrawl are out of the listing and
+   site, and `agents/openai.yaml` is deleted. Next is item 2. Original text: Clay and Exa
+   on, same prompt. Pass: the Run row or tool list shows
    the app's own fetch on the Wayback and board URLs; boards return HTTP 404; the pivot
    is bracketed from captures; Exa still does search. If it passes, the listing keeps
    Exa. If it fails, drop Exa and Firecrawl from `longDescription` and the site page
@@ -247,6 +249,20 @@ ships to both.
     URLs directly" now sends the URLs the skill builds through the app's own fetch,
     which returns the HTTP status. A connected search tool still does search and page
     reading. No vendor is named. Untested with Exa on.
+  - Run 12 / Clay and Exa on, routing fix (2026-10-17, 7:03; pasted plus screenshot).
+    **Routing failed:** Run row "Exa, Clay, web browsing". Sources panel "Exa, Clay, Web
+    search", with no "Search Service" (Run 11 listed "Search Service" and "Web search").
+    Archived pricing CRAWL_NOT_FOUND, browser fallback "not accessible", boards the same.
+    Wayback text came back without capture timestamps, so the pivot is dated by
+    announcement only. With Exa installed, the app's own fetch doesn't get used, and
+    `SKILL.md` can't change that without naming Exa. **Clay best yet:** "matched to this
+    company record" (the widget again showed two ZeroClick records), Headcount Growth
+    requested, and the 31% drop "around the commerce relaunch" in the top findings table.
+    Funding and investors came from the original announcement. Verdict "promising but
+    unproven". **Decision (rule from 1b):** Exa and Firecrawl dropped from
+    `longDescription` and the site, Clay kept; `agents/openai.yaml` (its only content was
+    the Exa dependency) deleted. `SKILL.md`'s routing text stays: it's right whenever
+    the app's fetch is in play.
   - A stray run used the Claude Code skill via Codex (the app reads `~/.agents/skills`):
     https://chatgpt.com/s/cx_6ac4516b7ca48191af87beebdcaf0720. Same trigger phrase; the
     plugin still won on the explicit prompt. Keep in mind when testing.
@@ -295,8 +311,8 @@ ships to both.
      headcount with its trend and the latest funding round, and labels the headcount
      ESTIMATE with the tool named. Its funding figure is a lead to confirm from press.
      There are no people or contact tools and no research agents. `agents/openai.yaml`
-     still declares only Exa: Run 3 showed it causes no connect prompt, and Clay's MCP URL
-     isn't documented by Clay. Flippable: name vendors as examples in `SKILL.md` if the
+     was deleted 2026-10-17 (Run 12). It declared only Exa, causes no connect prompt
+     (Run 3), and Clay doesn't document its MCP URL. Flippable: name vendors as examples in `SKILL.md` if the
      in-app run shows the model misses a connected tool without the name.
    - **Connectors: one generic rule, not vendor branches.** Rewrite the Tools section as
      capability slots: search and page text (Exa, Firecrawl); company data such as
