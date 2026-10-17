@@ -5,15 +5,17 @@
 Close to submittable. Items 1–2 block the ChatGPT submission.
 
 1. **Clay run in the app** (decision 5, decided 2026-10-17). First pass is Run 9
-   (State): labels, Run row, funding and trigger pass; the cross-check failed, and the fix
-   is untested. Confirm from Run 9's Clay step that no people or contact tools ran, then
-   rerun the same way. Connect Clay in ChatGPT, reinstall the plugin, new Codex chat, no
-   @-mention:
+   (State): labels, Run row, funding, trigger, and no contact tools in the visible log
+   pass; the cross-check failed. Two fixes are untested (cross-check, crawler codes).
+   Rerun with Clay **and Exa on**, the setup the listing copy suggests. Reinstall the
+   plugin, new Codex chat, no @-mention:
    `Competitive analysis of ZeroClick, zeroclick.ai`. Pass: the headcount trend appears,
    labeled ESTIMATE with Clay named and set against the pivot dates; Clay is in the Run
    row; no Clay people or contact tools are called; Clay's investor list (partner logos)
-   is not repeated as investors. It doubles as the "competitive analysis of X" trigger
-   test. Paste the report text into the session; don't share it.
+   is not repeated as investors; the headcount change shows up among the findings, tied
+   to the pivot; the job boards get an HTTP status from some fetch tool, or the report
+   names each crawler code it got. Paste the report text into the session; don't share
+   it.
 2. **Developer name** at the upload screen (decision 2), then the remaining submission
    steps: site pages deployed, zip, upload. `build.sh`: agent-skills unchanged since
    `2f3a16a` as of 2026-10-17, so no rerun needed unless it moves.
@@ -195,11 +197,19 @@ ships to both.
     "promising but unproven" (decision 3). New findings: Nevermined at 1–2% as the
     direct comparison, the Bytemine and ActionLayer integrations, the homepage figures
     being sample dashboard content, ZeroClick making the first purchases itself, and the
-    57% → "one in two" wording slip. Contact-tool check pending: Aaron to read the
-    app's Clay step. Follow-up: the headcount cross-check moved from Tools into method 1
-    as step 4, dated by announcement when the site bracket is wide. Untested. Pattern to
-    watch: both Exa-on runs (4, 9) got crawler codes in place of HTTP statuses on the
-    archive and the boards.
+    57% → "one in two" wording slip. **Tool log** (Aaron's screenshot, the visible
+    part; the list scrolls past it): the Clay calls were a company search (the "Opened
+    Clay" widget: ZeroClick, 11–50) and Get task context, with no people or contact
+    tools. The data-point chips under the widget are its add-data buttons, not calls.
+    Headcount most likely came from the search record's growth field, since no
+    add-data-points call shows. **Exa's own "Search skill" (`searching.md`) loaded
+    alongside `teardown`**, every fetch went through Exa, and the Greenhouse URL was
+    *searched for*, not fetched. Both Exa-on runs (4, 9) got crawler codes in place of
+    HTTP statuses on the archive and the boards; the Exa-off runs (5–7) got statuses.
+    Follow-ups, both untested: (1) the headcount cross-check moved from Tools into method
+    1 as step 4, dated by announcement when the site bracket is wide; (2) "Fetch URLs
+    directly" now treats a crawler code as a refusal and says to get the status from a
+    different fetch tool; only an HTTP 404 means not found.
   - A stray run used the Claude Code skill via Codex (the app reads `~/.agents/skills`):
     https://chatgpt.com/s/cx_6ac4516b7ca48191af87beebdcaf0720. Same trigger phrase; the
     plugin still won on the explicit prompt. Keep in mind when testing.
