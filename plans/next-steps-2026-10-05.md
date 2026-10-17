@@ -6,6 +6,12 @@ Close to submittable. Item 2 blocks the ChatGPT submission; 1a is optional.
 
 1. ~~**Clay run in the app**~~ Passed 2026-10-17 in Run 10 (State).
 1a. ~~**Exa-off control**~~ Done, Run 11: Exa's fetch is the cause.
+1c. ~~**Exa-free usefulness check**~~ Passed, Run 13 (State).
+1d. **v0.2 candidates** (batch after the first review decision; only one review can be
+   active at a time): fetch the pricing pages of the two or three closest competitors
+   and compare them with the subject's (Run 13 found Nevermined but not its 1–2% fee);
+   verdict calibration (decision 3); look again at Exa once its fetch returns HTTP
+   statuses for raw URLs.
 1b. ~~**Routing rerun**~~ Failed, Run 12. Exa and Firecrawl are out of the listing and
    site, and `agents/openai.yaml` is deleted. Next is item 2. Original text: Clay and Exa
    on, same prompt. Pass: the Run row or tool list shows
@@ -263,6 +269,22 @@ ships to both.
     `longDescription` and the site, Clay kept; `agents/openai.yaml` (its only content was
     the Exa dependency) deleted. `SKILL.md`'s routing text stays: it's right whenever
     the app's fetch is in play.
+  - Run 13 / Exa uninstalled, Clay on, current package (2026-10-17, 7:11; pasted plus
+    screenshot; GPT-6.1 Sol Medium). Sources panel "Clay, Search Service, Web search".
+    Run row: "web search, direct page fetches, Wayback Machine, Clay company data".
+    **Every method fired:** pivot May 20–June 6 from captures, with the launch post
+    noted as following the site change; Greenhouse, Lever, Ashby and /careers each HTTP
+    404, filed under "Not found"; Clay headcount 33 → 35 → 24, "contraction around the
+    repositioning period", ESTIMATE. The coverage section split cleanly into not found /
+    blocked / not established / not covered. **Usefulness against the Exa runs:**
+    Nevermined found (Run 11 missed it), but without its 1–2% fee, so no 5%-vs-1–2%
+    comparison; Stripe/Tempo MPP and Coinbase x402/Bazaar present. Traction: Ramp demo,
+    a new Dappier partnership, the first-purchase caveat, G2 with zero reviews. Missed
+    Product Hunt and the Bytemine/ActionLayer corroboration. Traps: ecosystem volume ≠
+    GMV and bot traffic ≠ demand caught; sample-dashboard figures not mentioned. Verdict
+    "promising but unproven". **Judged useful enough to drop Exa:** it gains the dated
+    pivot, the hiring absence and the headcount trend, and loses one competitor's
+    pricing and some corroboration.
   - A stray run used the Claude Code skill via Codex (the app reads `~/.agents/skills`):
     https://chatgpt.com/s/cx_6ac4516b7ca48191af87beebdcaf0720. Same trigger phrase; the
     plugin still won on the explicit prompt. Keep in mind when testing.
