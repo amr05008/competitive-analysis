@@ -20,6 +20,10 @@ PLUGIN_ID = "competitive-analysis"  # fixed for the life of the listing
 # Vendor names belong in the listing and on the site, never in a model-readable file.
 VENDORS = ["Clay", "Exa", "Firecrawl", "Monid"]
 FIELDS = ["version", "name", "subtitle", "category", "prompts"]
+# developers.openai.com/plugins/deploy/submission-errors, checked 2026-10-18
+CATEGORIES = ["Productivity", "Creativity", "Developer Tools", "Business & Operations",
+              "Data & Analytics", "Communication", "Education & Research", "Security",
+              "Finance", "Healthcare", "Travel", "Entertainment", "Other"]
 OBSIDIAN_FIELDS = {"tags", "aliases", "cssclasses"}  # Obsidian may add these; ignored
 
 
@@ -124,8 +128,9 @@ def main():
             errors.append(f"{label} must be one line of text")
     check_length(errors, "name", str(meta.get("name", "")), 30)
     check_length(errors, "subtitle", str(meta.get("subtitle", "")), 30)
-    if not meta.get("category"):
-        errors.append("category is empty")
+    if meta.get("category") not in CATEGORIES:
+        errors.append(f"category {meta.get('category')!r} isn't one the directory accepts: "
+                      f"{', '.join(CATEGORIES)}")
 
     prompts = meta.get("prompts", [])
     if not isinstance(prompts, list) or not prompts:

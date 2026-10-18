@@ -2,6 +2,16 @@
 
 ## Pick up here (updated 2026-10-18)
 
+**ChatGPT submission blocked (2026-10-18).** The 0.1.0 zip uploaded as a draft at
+platform.openai.com/plugins (Default project, developer "Aaron Roy"). Blocking findings:
+"Select a valid category" (fixed: `Research` isn't a directory category; now
+`Business & Operations`, and the build checks the list) and "We are not accepting more
+skills-only submissions at this time", which the docs don't mention; other developers
+report the same refusal. Informational: "We couldn't complete an automated assessment of
+your privacy policy." Site pages are live and the repo is public. Not tagged: nothing was
+submitted. Next decision: wait with the draft parked, ship the Claude version first, or
+add an MCP server (only possible before a first publish).
+
 Close to submittable. Item 2 blocks the ChatGPT submission; 1a is optional.
 
 **Listing workflow (2026-10-18):** the store copy now lives in

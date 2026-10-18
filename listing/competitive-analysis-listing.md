@@ -2,7 +2,7 @@
 version: 0.1.0
 name: Competitive Analysis
 subtitle: Research companies and URLs
-category: Research
+category: Business & Operations
 prompts:
   - Competitive analysis of <company>
   - Tear down this <company> 

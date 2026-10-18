@@ -25,7 +25,7 @@
         "shortDescription": "Research companies and URLs",
         "longDescription": "The Competitive Analysis plugin helps founders, product people and business analysts tear down companies and landing pages to understand positioning, product capabilities, and company growth.\n\nHow it works:\n- You name a company and/or a landing page\n- The report dates changes in positioning and pricing from Wayback Machine captures, reads the company's own job listings for what it's actually building, reconciles sources that disagree, and treats silence as evidence.\n- You get a teardown where every claim carries a link, a date, and a VERIFIED / COMPANY-CLAIMED / ESTIMATE label\n\nThis plugin researches companies, not people. To get the most from this plugin, you should have the Clay plugin enabled, but it will also be valuable without that turned on.",
         "developerName": "Aaron Roy",
-        "category": "Research",
+        "category": "Business & Operations",
         "capabilities": [
           "Read"
         ],
