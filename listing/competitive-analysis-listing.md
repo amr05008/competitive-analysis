@@ -6,7 +6,7 @@ category: Research
 prompts:
   - Competitive analysis of <company>
   - Tear down this <company> 
-  - How has this pricing page changed over time? <url>
+  - What does this pricing page signal? <url>
 ---
 
 The store listing for ChatGPT, and later Claude. Edit the properties above and the two sections below, then run `sh scripts/build.sh`. It copies this into `plugin.json`, refuses anything over the limits, and builds the upload zip.
