@@ -8,11 +8,16 @@ submission.
 
 ## Layout
 
-- `plugin.json`: the portable manifest.
+- `listing/competitive-analysis-listing.md`: the store listing (name, subtitle, prompts,
+  description, release notes). The one place to edit them.
+- `plugin.json`: the portable manifest. Its listing fields are **generated** from the
+  listing file; the rest is edited by hand.
 - `skills/teardown/SKILL.md`: the method, written for a model with a browser and
   whatever plugins the user connected.
 - `skills/teardown/references/report-template.md`: **generated** by
   `scripts/build.sh` from agent-skills; the report contract has one source.
+- `scripts/build.sh`: regenerates both, checks the listing limits and vendor names, and
+  writes `dist/competitive-analysis-<version>.zip`.
 - `assets/`: icon and logo.
 - `LICENSE`: MIT. Ships in the zip.
 
@@ -33,4 +38,8 @@ See `plans/next-steps-2026-10-05.md` for state, open decisions, and remaining te
 - [x] Listing copy: `longDescription` reworded (no "worry"), Clay added. 2026-10-17.
 - [x] Clay run in the app: ZeroClick with Clay connected. Headcount labeled ESTIMATE with
       Clay named, Clay in the Run row, no Clay contact tools called. Run 10, 2026-10-17.
-- [ ] Zip the repo root (`plugin.json`, `LICENSE`, `skills/`, `assets/`), no `.git`, no `scripts/`.
+- [ ] `sh scripts/build.sh` passes and writes `dist/competitive-analysis-0.1.0.zip`
+      (`plugin.json`, `LICENSE`, `skills/`, `assets/`). Blocked 2026-10-18: subtitle is
+      31 characters, limit 30.
+- [ ] Support section live at `supportURL` (aaronroy.com/competitive-analysis/#support).
+- [ ] Tag the uploaded commit `v0.1.0`.

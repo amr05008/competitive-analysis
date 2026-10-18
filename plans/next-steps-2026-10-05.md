@@ -1,8 +1,16 @@
 # Next steps for the plugin (written 2026-10-05, end of day)
 
-## Pick up here (updated 2026-10-17)
+## Pick up here (updated 2026-10-18)
 
 Close to submittable. Item 2 blocks the ChatGPT submission; 1a is optional.
+
+**Listing workflow (2026-10-18):** the store copy now lives in
+`listing/competitive-analysis-listing.md`, symlinked into Aaron's vault for Obsidian.
+`sh scripts/build.sh` copies it into `plugin.json`, checks limits, plugin id and vendor
+names, and writes `dist/competitive-analysis-<version>.zip`; the packaged report template
+now drops "(Clay, LinkedIn via Monid)". `supportURL` points at a new Support section on
+the project page (site branch, unpushed). The build currently refuses the listing: the
+subtitle "Research companies and websites" is 31 characters.
 
 1. ~~**Clay run in the app**~~ Passed 2026-10-17 in Run 10 (State).
 1a. ~~**Exa-off control**~~ Done, Run 11: Exa's fetch is the cause.
@@ -32,8 +40,9 @@ Close to submittable. Item 2 blocks the ChatGPT submission; 1a is optional.
    names each crawler code it got. Paste the report text into the session; don't share
    it.
 2. **Developer name** at the upload screen (decision 2), then the remaining submission
-   steps: site pages deployed, zip, upload. `build.sh`: agent-skills unchanged since
-   `2f3a16a` as of 2026-10-17, so no rerun needed unless it moves.
+   steps: site pages deployed, `sh scripts/build.sh` passes, upload
+   `dist/competitive-analysis-0.1.0.zip`, tag the commit `v0.1.0`. agent-skills unchanged
+   since `2f3a16a` as of 2026-10-18.
 3. **Remaining tests** under Testing. None blocks.
 4. **Decide 3** (verdict calibration). Doesn't block.
 5. **Claude fast follow** once ChatGPT is submitted.

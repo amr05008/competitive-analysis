@@ -16,7 +16,7 @@ Tailor the so-what to the stated **purpose** (operator diligence / potential par
 - Byline "Prepared by <byline> for <org>, <run date>", where <byline> comes from the house config and <org> is the recipient org named in the purpose and never the subject company. With no nameable org the byline is "Prepared by <byline>, <run date>" and the next moves address the reader. The byline names <org> only; a team named in the purpose appears in the Audience row and is who the next moves in §10, or the Assessment in page-signal mode, are addressed to.
 - Free of the caller's private framing: no operator-profile references, no "why I'm looking", no side projects. (The operator profile may still be read to calibrate; it is never cited.)
 - People by public role: names, titles, tenure, prior companies, labeled as usual. No contact fields — no emails, phones, or handles — and no enrichment-record dumps.
-- Paid and enriched sources (Clay, LinkedIn via Monid) summarized and cited; a quote from a paid post is at most one sentence.
+- Paid and enriched sources summarized and cited; a quote from a paid post is at most one sentence.
 - Coverage gaps stated as what wasn't covered ("Reddit not searched"), not which internal tool was missing.
 - Same evidence discipline, structure, verdict, and length band as `me`.
 

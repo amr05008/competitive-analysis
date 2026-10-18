@@ -21,6 +21,7 @@
         "websiteURL": "https://aaronroy.com/competitive-analysis/",
         "privacyPolicyURL": "https://aaronroy.com/competitive-analysis/privacy/",
         "termsOfServiceURL": "https://aaronroy.com/competitive-analysis/terms/",
+        "supportURL": "https://aaronroy.com/competitive-analysis/#support",
         "defaultPrompt": [
           "Competitive analysis of <company>",
           "Teardown of <company> and its landing page",

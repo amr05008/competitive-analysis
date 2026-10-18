@@ -19,6 +19,19 @@ Not" (renamed 2026-10-11); plans and session logs keep the old name as history.
   `claude-channels` repo, mirrored publicly to `amr05008/agent-skills`.
   `skills/teardown/references/report-template.md` is **generated** by
   `scripts/build.sh` from the agent-skills checkout. Never edit it here.
+- The store listing's source is `listing/competitive-analysis-listing.md`: version, name,
+  subtitle, category and prompts in its frontmatter, the description and release notes in its
+  body. `scripts/build.sh` (via `scripts/listing.py`) copies them into `plugin.json`, checks
+  the directory's limits, the plugin id and vendor names in `skills/`, and zips the package
+  into `dist/`. Never hand-edit `version`, `displayName`, `shortDescription`,
+  `longDescription`, `category`, `defaultPrompt` or `publication.release_notes` in
+  `plugin.json`; the rest of `plugin.json` (URLs, icons, ids) is edited by hand. Aaron edits
+  the listing in Obsidian: `listing/` is symlinked into his vault at
+  `_areas/competitive-analysis/listing`, so only add frontmatter fields `listing.py` knows.
+  His private status notes (dashboard links, review history, update checklist) are in
+  `_areas/competitive-analysis/competitive-analysis-reference.md` in the vault, not here.
+- Each uploaded zip's commit is tagged `v<version>`. The build refuses to zip a tagged
+  version from different files.
 - Background and decisions: `claude-channels/plans/worry-or-not-2026-10-05.md` and
   `claude-channels/plans/competitive-research-plugin-landscape-2026-10-05.md`.
 
