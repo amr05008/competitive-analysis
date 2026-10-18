@@ -32,6 +32,9 @@ Not" (renamed 2026-10-11); plans and session logs keep the old name as history.
   `_areas/competitive-analysis/competitive-analysis-reference.md` in the vault, not here.
 - Each uploaded zip's commit is tagged `v<version>`. The build refuses to zip a tagged
   version from different files.
+- This repo is Aaron's only public competitive-analysis plugin. The February 2026 Claude
+  Code plugin `amr05008/clay-claude-competitor-analysis` was archived on 2026-10-18 with a
+  README pointing here; don't revive it or send users to it.
 - Background and decisions: `claude-channels/plans/worry-or-not-2026-10-05.md` and
   `claude-channels/plans/competitive-research-plugin-landscape-2026-10-05.md`.
 
