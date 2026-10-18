@@ -3,33 +3,47 @@
   "name": "competitive-analysis",
   "version": "0.1.0",
   "description": "Evidence-graded teardown of one company: positioning history, job-listing mining, contradictions, absence as evidence, and a label on every claim.",
-  "author": { "name": "Aaron Roy", "url": "https://aaronroy.com" },
+  "author": {
+    "name": "Aaron Roy",
+    "url": "https://aaronroy.com"
+  },
   "homepage": "https://aaronroy.com/competitive-analysis/",
   "repository": "https://github.com/amr05008/competitive-analysis",
   "license": "MIT",
-  "keywords": ["competitive-analysis", "teardown", "due-diligence", "competitor-research", "market-research"],
+  "keywords": [
+    "competitive-analysis",
+    "teardown",
+    "due-diligence",
+    "competitor-research",
+    "market-research"
+  ],
   "skills": "./skills/",
   "extensions": {
     "com.openai": {
       "interface": {
         "displayName": "Competitive Analysis",
-        "shortDescription": "Evidence-graded teardowns",
-        "longDescription": "Name a company and get a teardown where every claim carries a link, a date, and a VERIFIED / COMPANY-CLAIMED / ESTIMATE label. It dates changes in positioning and pricing from Wayback Machine captures, reads the company's own job listings for what it's actually building, reconciles sources that disagree, and treats silence as evidence. It ends with one of four verdicts and the two or three variables that decide it. Built for founders, product people and operators sizing up a competitor, a partner or a market. Connect your own Clay for company data such as headcount history. Without it, it runs on built-in browsing and says where that left gaps. It researches companies, not people, and isn't for stock picks or investment advice.",
+        "shortDescription": "Research companies and URLs",
+        "longDescription": "The Competitive Analysis plugin helps founders, product people and business analysts tear down companies and landing pages to understand positioning, product capabilities, and company growth.\n\nHow it works:\n- You name a company and/or a landing page\n- The report dates changes in positioning and pricing from Wayback Machine captures, reads the company's own job listings for what it's actually building, reconciles sources that disagree, and treats silence as evidence.\n- You get a teardown where every claim carries a link, a date, and a VERIFIED / COMPANY-CLAIMED / ESTIMATE label\n\nThis plugin researches companies, not people. To get the most from this plugin, you should have the Clay plugin enabled, but it will also be valuable without that turned on.",
         "developerName": "Aaron Roy",
         "category": "Research",
-        "capabilities": ["Read"],
+        "capabilities": [
+          "Read"
+        ],
         "websiteURL": "https://aaronroy.com/competitive-analysis/",
         "privacyPolicyURL": "https://aaronroy.com/competitive-analysis/privacy/",
         "termsOfServiceURL": "https://aaronroy.com/competitive-analysis/terms/",
         "supportURL": "https://aaronroy.com/competitive-analysis/#support",
         "defaultPrompt": [
           "Competitive analysis of <company>",
-          "Teardown of <company> and its landing page",
-          "What does this pricing page signal? <url>"
+          "Tear down this <company>",
+          "How has this pricing page changed over time? <url>"
         ],
         "brandColor": "#1F6F5F",
         "composerIcon": "./assets/icon-small.svg",
         "logo": "./assets/logo.png"
+      },
+      "publication": {
+        "release_notes": "Initial release."
       }
     }
   }
