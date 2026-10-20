@@ -21,7 +21,7 @@ submission.
 - `assets/`: icon and logo.
 - `LICENSE`: MIT. Ships in the zip.
 
-See `plans/next-steps-2026-10-05.md` for state, open decisions, and remaining tests.
+Planning notes and the test log are kept outside this repo.
 
 ## Before submission
 
@@ -38,8 +38,7 @@ See `plans/next-steps-2026-10-05.md` for state, open decisions, and remaining te
 - [x] Listing copy: `longDescription` reworded (no "worry"), Clay added. 2026-10-17.
 - [x] Clay run in the app: ZeroClick with Clay connected. Headcount labeled ESTIMATE with
       Clay named, Clay in the Run row, no Clay contact tools called. Run 10, 2026-10-17.
-- [ ] `sh scripts/build.sh` passes and writes `dist/competitive-analysis-0.1.0.zip`
-      (`plugin.json`, `LICENSE`, `skills/`, `assets/`). Blocked 2026-10-18: subtitle is
-      31 characters, limit 30.
-- [ ] Support section live at `supportURL` (aaronroy.com/competitive-analysis/#support).
+- [x] `sh scripts/build.sh` passes and writes `dist/competitive-analysis-0.1.0.zip`
+      (`plugin.json`, `LICENSE`, `skills/`, `assets/`). 2026-10-18.
+- [x] Support section live at `supportURL` (aaronroy.com/competitive-analysis/#support). 2026-10-18.
 - [ ] Tag the uploaded commit `v0.1.0`.

@@ -1,3 +1,4 @@
 .git
 *.zip
 dist/
+/plans

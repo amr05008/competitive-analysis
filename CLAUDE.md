@@ -30,6 +30,11 @@ Not" (renamed 2026-10-11); plans and session logs keep the old name as history.
   `_areas/competitive-analysis/listing`, so only add frontmatter fields `listing.py` knows.
   His private status notes (dashboard links, review history, update checklist) are in
   `_areas/competitive-analysis/competitive-analysis-reference.md` in the vault, not here.
+- `plans/` is a **git-ignored symlink** to Aaron's private vault
+  (`~/repos/vault/_areas/competitive-analysis/plans/`): the plans, the server design and the
+  run log. It exists only on Aaron's Macs, and the files are committed in the vault repo, not
+  here. Moved out of this public repo on 2026-10-20, and the server design was removed from
+  its history.
 - Each uploaded zip's commit is tagged `v<version>`. The build refuses to zip a tagged
   version from different files.
 - This repo is Aaron's only public competitive-analysis plugin. The February 2026 Claude
@@ -48,6 +53,9 @@ Not" (renamed 2026-10-11); plans and session logs keep the old name as history.
   Artifact, INTERNAL, Monid CLI) belongs here.
 - Commit and push straight to `main` until a live version is listed in a directory. After
   that, feature branches and PRs.
+- This repo is public. Plans, designs, run logs and anything about Aaron's accounts or limits
+  go in `plans/` (the vault), never in git. Write new ones there as
+  `plans/<topic>-<YYYY-MM-DD>.md`.
 
 ## Test loop
 
