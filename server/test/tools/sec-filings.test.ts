@@ -318,7 +318,7 @@ describe("sec_filings", () => {
     for (const [cik, name] of [...first, ...second]) if (!routes[subUrl(cik)]) routes[subUrl(cik)] = makeSub(name, cik, {}, ["4"]);
     const { result, fetch } = await call({ company_name: "Meta", domain: "facebook.com" }, routes, { maxFetches: 40 });
     // interleaving alone would reach only index 3 of the second list within 8 candidates
-    expect(fetch.calls.indexOf(subUrl("1326801"))).toBe(3); // right after the two searches
+    expect(fetch.calls.indexOf(subUrl("1326801"))).toBe(2); // the first submissions read, right after the two searches
     expect(result.entities?.map((e) => e.name)).toEqual(["Facebook, Inc."]);
   });
 
