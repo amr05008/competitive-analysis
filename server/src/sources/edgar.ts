@@ -29,6 +29,8 @@ const INDUSTRY_BY_KEY = new Map(INDUSTRY_GROUPS.map((g) => [industryKey(g), g]))
 /** The most recent filings kept per company, besides every Form D. */
 const KEEP_FILINGS = 100;
 const MAX_HITS = 10;
+/** Part of every cache key; bump it when a cached shape or a rule changes so old entries are never read. */
+export const CACHE_VERSION = "v2";
 const MAX_NAME_CHARS = 200;
 
 export type Filing = { form: string; date: string; accession: string };
@@ -82,7 +84,7 @@ async function fetchParsed<T>(
   what: string,
 ): Promise<({ ok: true; value: T }) | FailedOutcome> {
   let failure: FailedOutcome | null = null;
-  const { value } = await cached<T>(cache, url, TTL_EDGAR, async () => {
+  const { value } = await cached<T>(cache, `${CACHE_VERSION}:${url}`, TTL_EDGAR, async () => {
     const r = await politeFetch(fetcher, url, { maxBytes });
     if (!r.ok) {
       failure = r;
@@ -127,6 +129,27 @@ const stateOf = (v: unknown): string | null => {
   const s = str(v)?.trim();
   return s ? s : null;
 };
+
+const strOrNull = (v: unknown) => v === null || typeof v === "string";
+
+/** Whether a value read back from the cache has exactly the record's shape. */
+function isSubmissions(v: unknown): v is Submissions {
+  const o = obj(v);
+  if (!o) return false;
+  return (
+    typeof o.cik === "string" &&
+    typeof o.name === "string" &&
+    strOrNull(o.stateOfIncorporation) &&
+    strOrNull(o.businessState) &&
+    Array.isArray(o.formerNames) &&
+    o.formerNames.every((n) => typeof n === "string") &&
+    Array.isArray(o.filings) &&
+    o.filings.every((f) => {
+      const x = obj(f);
+      return !!x && typeof x.form === "string" && typeof x.date === "string" && typeof x.accession === "string";
+    })
+  );
+}
 
 /** What is cached for an entity that is not a listable company: no name, no forms. */
 type NotListable = { listable: false };
@@ -174,7 +197,9 @@ export async function getSubmissions(
 ): Promise<{ ok: true; sub: Submissions | null } | FailedOutcome> {
   const url = `https://data.sec.gov/submissions/CIK${cik.padStart(10, "0")}.json`;
   const r = await fetchParsed(fetcher, cache, url, 3_000_000, parseSubmissions, "submissions");
-  return r.ok ? { ok: true, sub: "listable" in r.value ? null : r.value } : r;
+  if (!r.ok) return r;
+  // A cached value is trusted for nothing: check its shape and re-apply the listing rule on every read.
+  return { ok: true, sub: isSubmissions(r.value) && isListableCompany(r.value) ? r.value : null };
 }
 
 // ------------------------------------------------------------------- Form D
