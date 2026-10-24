@@ -16,8 +16,10 @@ export const FALLBACK_LINE = "fall back to browsing for this check.";
  * Every object in a tool's output. Its JSON Schema allows extra keys
  * (`additionalProperties: {}`, where a plain zod object gives `false`), so a
  * field added later still validates against the schema a directory approved.
+ * Its TypeScript type stays closed, so a misspelled field doesn't compile.
  */
-export const outputObject = <S extends z.ZodRawShape>(shape: S) => z.looseObject(shape);
+export const outputObject = <S extends z.ZodRawShape>(shape: S) =>
+  z.looseObject(shape) as unknown as z.ZodObject<S>;
 
 /**
  * An output value from a set that may grow, such as error reasons. Its JSON
@@ -54,11 +56,17 @@ export type ErrorEnvelope = Envelope & { status: "error"; error: NonNullable<Env
 /** A UTC date as YYYY-MM-DD. */
 export const utcDay = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 
-export function errorResult(reason: ErrorReason, detail: string, tried: string[]): ErrorEnvelope {
+/** A failed check. Tools pass `deps.now()` as `now`, so results follow the injected clock. */
+export function errorResult(
+  reason: ErrorReason,
+  detail: string,
+  tried: string[],
+  now: number = Date.now(),
+): ErrorEnvelope {
   return {
     status: "error",
     notes: [],
-    retrieved_at: utcDay(Date.now()),
+    retrieved_at: utcDay(now),
     error: { reason, detail, tried, fallback: FALLBACK_LINE },
   };
 }

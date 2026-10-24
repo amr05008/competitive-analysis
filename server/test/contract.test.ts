@@ -1,7 +1,8 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
-import { assertAdditive, type ToolListJson } from "../src/contract/additive";
-import { TOOL_NAMES } from "../src/contract/tools";
+import { assertAdditive, type JsonSchema, type ToolListJson } from "../src/contract/additive";
+import { errorResult, type ErrorReason } from "../src/contract/envelope";
+import { TOOL_NAMES, type JobOpeningsResult } from "../src/contract/tools";
 import { rpc } from "./helpers/mcp";
 
 const SNAPSHOT = "./__snapshots__/tools-list.json";
@@ -170,5 +171,165 @@ describe("assertAdditive", () => {
     const after = before();
     after.tools.push({ name: "new_tool", inputSchema: { type: "object" }, annotations: {} });
     expect(() => assertAdditive(before(), after)).not.toThrow();
+  });
+
+  // A list with one extra input or output property, `kind`, set to `schema`.
+  const withInput = (schema: JsonSchema) => {
+    const list = before();
+    input(list).kind = schema;
+    return list;
+  };
+  const withOutput = (schema: JsonSchema) => {
+    const list = before();
+    output(list).kind = schema;
+    return list;
+  };
+  const check = (was: ToolListJson, now: ToolListJson) => () => assertAdditive(was, now);
+
+  describe("outputs must still validate under the old schema", () => {
+    it("adding a value to an output enum throws", () => {
+      const was = withOutput({ type: "string", enum: ["ok", "error"] });
+      const now = withOutput({ type: "string", enum: ["ok", "error", "partial"] });
+      expect(check(was, now)).toThrow(/added value "partial" to output kind/);
+    });
+
+    it("dropping an output enum throws", () => {
+      const was = withOutput({ type: "string", enum: ["posted", "updated"] });
+      expect(check(was, withOutput({ type: "string" }))).toThrow(/dropped the value list of output kind/);
+    });
+
+    it("changing an output const throws", () => {
+      const was = withOutput({ type: "string", const: "fall back to browsing for this check." });
+      const now = withOutput({ type: "string", const: "something else" });
+      expect(check(was, now)).toThrow(/added value "something else" to output kind/);
+    });
+
+    it("an enum inside a nullable output is checked too", () => {
+      const was = withOutput({ anyOf: [{ type: "string", enum: ["a"] }, { type: "null" }] });
+      const now = withOutput({ anyOf: [{ type: "string", enum: ["a", "b"] }, { type: "null" }] });
+      expect(check(was, now)).toThrow(/added value "b" to output kind/);
+    });
+
+    it("removing a value from an output enum passes", () => {
+      const was = withOutput({ type: "string", enum: ["ok", "partial", "error"] });
+      const now = withOutput({ type: "string", enum: ["ok", "error"] });
+      expect(check(was, now)).not.toThrow();
+    });
+
+    it("closing an output to extra properties throws", () => {
+      const now = before();
+      tool(now).outputSchema!.additionalProperties = false;
+      expect(check(before(), now)).toThrow(/closed the output to extra properties/);
+    });
+  });
+
+  describe("inputs the old schema accepted must still pass", () => {
+    it("removing a value from an input enum throws", () => {
+      const was = withInput({ type: "string", enum: ["story", "comment"] });
+      expect(check(was, withInput({ type: "string", enum: ["story"] }))).toThrow(
+        /removed value "comment" from input kind/,
+      );
+    });
+
+    it("adding an enum to an input throws", () => {
+      const now = withInput({ type: "string", enum: ["story"] });
+      expect(check(withInput({ type: "string" }), now)).toThrow(/limited input kind to the values "story"/);
+    });
+
+    it("adding a value to an input enum passes", () => {
+      const was = withInput({ type: "string", enum: ["story"] });
+      expect(check(was, withInput({ type: "string", enum: ["story", "comment"] }))).not.toThrow();
+    });
+
+    it.each<[string, JsonSchema, JsonSchema]>([
+      ["minimum", { type: "integer", minimum: 1 }, { type: "integer", minimum: 2 }],
+      ["maximum", { type: "integer", maximum: 15 }, { type: "integer", maximum: 10 }],
+      ["minLength", { type: "string", minLength: 2 }, { type: "string", minLength: 3 }],
+      ["maxLength", { type: "string", maxLength: 80 }, { type: "string", maxLength: 40 }],
+      ["minItems", { type: "array", items: { type: "string" } }, { type: "array", items: { type: "string" }, minItems: 1 }],
+      ["maxItems", { type: "array", items: { type: "string" }, maxItems: 5 }, { type: "array", items: { type: "string" }, maxItems: 3 }],
+    ])("tightening an input's %s throws", (key, was, now) => {
+      expect(check(withInput(was), withInput(now))).toThrow(new RegExp(`tightened ${key} of input kind`));
+    });
+
+    it("loosening input bounds passes", () => {
+      const was = withInput({ type: "string", minLength: 2, maxLength: 80 });
+      expect(check(was, withInput({ type: "string", minLength: 1 }))).not.toThrow();
+    });
+
+    it("adding an input pattern throws", () => {
+      const now = withInput({ type: "string", pattern: "^\\d{4}$" });
+      expect(check(withInput({ type: "string" }), now)).toThrow(/added the pattern of input kind/);
+    });
+
+    it("changing an input pattern throws", () => {
+      const was = withInput({ type: "string", pattern: "^\\d{4}-\\d{2}$" });
+      const now = withInput({ type: "string", pattern: "^\\d{4}$" });
+      expect(check(was, now)).toThrow(/changed the pattern of input kind/);
+    });
+
+    it("adding an input format throws", () => {
+      const now = withInput({ type: "string", format: "uri" });
+      expect(check(withInput({ type: "string" }), now)).toThrow(/added the format of input kind/);
+    });
+  });
+
+  it("reports every break in one error", () => {
+    const now = before();
+    delete input(now).from;
+    tool(now).annotations = {};
+    expect(check(before(), now)).toThrow(/removed input property from[\s\S]*changed annotations/);
+  });
+});
+
+describe("result types", () => {
+  it("are closed: a misspelled field or an unknown value doesn't compile", () => {
+    // `npm run typecheck` fails if any of these stop being errors.
+    const result: JobOpeningsResult = {
+      status: "ok",
+      notes: [],
+      retrieved_at: "2026-10-20",
+      board: {
+        // @ts-expect-error board services are a closed union in TypeScript
+        ats: "workday",
+        slug: "example",
+        url: "https://example.com/jobs",
+      },
+      roles: [
+        {
+          id: "1",
+          title: "Engineer",
+          department: null,
+          location: null,
+          date: null,
+          date_kind: "posted",
+          pay: null,
+          link: "https://example.com/jobs/1",
+          // @ts-expect-error a misspelled nested field
+          descripton: "A typo for description.",
+        },
+      ],
+    };
+    // @ts-expect-error error reasons are a closed union in TypeScript
+    const reason: ErrorReason = "something_else";
+    expect(result.roles).toHaveLength(1);
+    expect(reason).toBe("something_else");
+  });
+});
+
+describe("errorResult", () => {
+  it("stamps retrieved_at from the clock it's given", () => {
+    const result = errorResult("not_found", "no board", ["https://example.com/careers"], Date.UTC(2026, 9, 20, 23, 59));
+    expect(result.retrieved_at).toBe("2026-10-20");
+    expect(result.error).toEqual({
+      reason: "not_found",
+      detail: "no board",
+      tried: ["https://example.com/careers"],
+      fallback: "fall back to browsing for this check.",
+    });
+  });
+
+  it("defaults to the current time", () => {
+    expect(errorResult("bad_input", "x", []).retrieved_at).toBe(new Date().toISOString().slice(0, 10));
   });
 });

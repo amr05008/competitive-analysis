@@ -1,7 +1,16 @@
-// The additive-only rule, checked on two tools/list responses. A tool may gain
-// optional inputs and output fields; it never loses a tool, an input or an
-// output field, never changes a field's type, never makes an input required,
-// never makes a guaranteed output optional, and never changes its annotations.
+// The additive-only rule, checked on two tools/list responses. A directory may
+// hold an update and keep the old, approved schema in force, so every new
+// output must still validate under the old schema, and every input the old
+// schema accepted must still pass. A tool may gain tools, optional inputs and
+// output fields. It never:
+// - removes a tool, an input or an output field, or changes a field's type
+// - makes an input required, or a guaranteed output optional
+// - adds a value to an output's enum or const, or drops that list
+// - closes an output object to extra properties
+// - removes a value from an input's enum, or adds an enum to an input
+// - tightens an input's minimum, maximum, minLength, maxLength, minItems or
+//   maxItems, or adds or changes its pattern or format
+// - changes its annotations
 // Titles and descriptions are free to change.
 
 export type JsonSchema = {
@@ -11,6 +20,8 @@ export type JsonSchema = {
   items?: JsonSchema;
   anyOf?: JsonSchema[];
   oneOf?: JsonSchema[];
+  enum?: unknown[];
+  additionalProperties?: unknown;
   [key: string]: unknown;
 };
 
@@ -25,6 +36,11 @@ export type ToolListJson = {
 };
 
 type Side = "input" | "output";
+type Report = (problem: string) => void;
+
+const LOWER_BOUNDS = ["minimum", "minLength", "minItems"] as const;
+const UPPER_BOUNDS = ["maximum", "maxLength", "maxItems"] as const;
+const FORMATS = ["pattern", "format"] as const;
 
 /** Throws, naming every break, unless `after` only adds to `before`. */
 export function assertAdditive(before: ToolListJson, after: ToolListJson): void {
@@ -36,54 +52,98 @@ export function assertAdditive(before: ToolListJson, after: ToolListJson): void 
       breaks.push(`removed tool ${was.name}`);
       continue;
     }
-    compare(was.inputSchema, now.inputSchema, "input", "", (b) => breaks.push(`${was.name}: ${b}`));
+    const report: Report = (problem) => breaks.push(`${was.name}: ${problem}`);
+    compare(was.inputSchema, now.inputSchema, "input", "", report);
     if (was.outputSchema) {
-      if (!now.outputSchema) breaks.push(`${was.name}: removed its output schema`);
-      else compare(was.outputSchema, now.outputSchema, "output", "", (b) => breaks.push(`${was.name}: ${b}`));
+      if (!now.outputSchema) report("removed its output schema");
+      else compare(was.outputSchema, now.outputSchema, "output", "", report);
     }
-    if (canonical(was.annotations ?? {}) !== canonical(now.annotations ?? {})) {
-      breaks.push(`${was.name}: changed annotations from ${canonical(was.annotations ?? {})} to ${canonical(now.annotations ?? {})}`);
-    }
+    const wasAnnotations = canonical(was.annotations ?? {});
+    const nowAnnotations = canonical(now.annotations ?? {});
+    if (wasAnnotations !== nowAnnotations) report(`changed annotations from ${wasAnnotations} to ${nowAnnotations}`);
   }
   if (breaks.length > 0) throw new Error(`non-additive contract change:\n- ${breaks.join("\n- ")}`);
 }
 
-function compare(was: JsonSchema, now: JsonSchema, side: Side, path: string, report: (b: string) => void): void {
-  const label = path || `the ${side}`;
-  const wasTypes = typesOf(was);
-  const nowTypes = typesOf(now);
-  if (wasTypes !== nowTypes) {
-    report(`changed the type of ${side} ${label} from ${wasTypes} to ${nowTypes}`);
+function compare(was: JsonSchema, now: JsonSchema, side: Side, path: string, report: Report): void {
+  const label = path ? `${side} ${path}` : `the ${side}`;
+  const wasTypes = typeSet(was);
+  const nowTypes = typeSet(now);
+  if (wasTypes.join("|") !== nowTypes.join("|")) {
+    report(`changed the type of ${label} from ${wasTypes.join("|") || "any"} to ${nowTypes.join("|") || "any"}`);
     return;
   }
-
-  const wasObject = part(was, "object");
-  const nowObject = part(now, "object");
-  if (wasObject && nowObject) {
-    const nowProps = nowObject.properties ?? {};
-    for (const [key, sub] of Object.entries(wasObject.properties ?? {})) {
-      const subPath = path ? `${path}.${key}` : key;
-      const nowSub = nowProps[key];
-      if (!nowSub) report(`removed ${side} property ${subPath}`);
-      else compare(sub, nowSub, side, subPath, report);
-    }
-    const wasRequired = new Set(wasObject.required ?? []);
-    const nowRequired = new Set(nowObject.required ?? []);
-    const prefix = path ? `${path}.` : "";
-    if (side === "input") {
-      for (const key of nowRequired) if (!wasRequired.has(key)) report(`made input ${prefix}${key} required`);
-    } else {
-      for (const key of wasRequired) if (!nowRequired.has(key)) report(`made output ${prefix}${key} optional`);
-    }
+  for (const type of wasTypes) {
+    const w = part(was, type);
+    const n = part(now, type);
+    if (!w || !n) continue;
+    if (side === "output") checkOutputValues(w, n, label, report);
+    else checkInputLimits(w, n, label, report);
+    if (type === "object") compareObjects(w, n, side, path, label, report);
+    if (type === "array" && w.items && n.items) compare(w.items, n.items, side, `${path}[]`, report);
   }
-
-  const wasItems = part(was, "array")?.items;
-  const nowItems = part(now, "array")?.items;
-  if (wasItems && nowItems) compare(wasItems, nowItems, side, `${path}[]`, report);
 }
 
-/** The JSON types a schema allows, sorted and joined, such as "null|object". */
-function typesOf(schema: JsonSchema): string {
+function compareObjects(was: JsonSchema, now: JsonSchema, side: Side, path: string, label: string, report: Report): void {
+  if (side === "output" && was.additionalProperties !== false && now.additionalProperties === false) {
+    report(`closed ${label} to extra properties`);
+  }
+  const nowProps = now.properties ?? {};
+  for (const [key, sub] of Object.entries(was.properties ?? {})) {
+    const subPath = path ? `${path}.${key}` : key;
+    const nowSub = nowProps[key];
+    if (!nowSub) report(`removed ${side} property ${subPath}`);
+    else compare(sub, nowSub, side, subPath, report);
+  }
+  const wasRequired = new Set(was.required ?? []);
+  const nowRequired = new Set(now.required ?? []);
+  const prefix = path ? `${path}.` : "";
+  if (side === "input") {
+    for (const key of nowRequired) if (!wasRequired.has(key)) report(`made input ${prefix}${key} required`);
+  } else {
+    for (const key of wasRequired) if (!nowRequired.has(key)) report(`made output ${prefix}${key} optional`);
+  }
+}
+
+/** Outputs: an enum or const may only shrink, and never disappear. */
+function checkOutputValues(was: JsonSchema, now: JsonSchema, label: string, report: Report): void {
+  const wasValues = valuesOf(was);
+  if (!wasValues) return;
+  const nowValues = valuesOf(now);
+  if (!nowValues) {
+    report(`dropped the value list of ${label}`);
+    return;
+  }
+  for (const value of nowValues) if (!wasValues.includes(value)) report(`added value ${value} to ${label}`);
+}
+
+/** Inputs: an enum may only grow, bounds may only loosen, and no new pattern or format. */
+function checkInputLimits(was: JsonSchema, now: JsonSchema, label: string, report: Report): void {
+  const wasValues = valuesOf(was);
+  const nowValues = valuesOf(now);
+  if (nowValues) {
+    if (!wasValues) report(`limited ${label} to the values ${nowValues.join(", ")}`);
+    else for (const value of wasValues) if (!nowValues.includes(value)) report(`removed value ${value} from ${label}`);
+  }
+  for (const key of LOWER_BOUNDS) {
+    const w = numberAt(was, key);
+    const n = numberAt(now, key);
+    if (n !== undefined && (w === undefined || n > w)) report(`tightened ${key} of ${label} from ${w ?? "none"} to ${n}`);
+  }
+  for (const key of UPPER_BOUNDS) {
+    const w = numberAt(was, key);
+    const n = numberAt(now, key);
+    if (n !== undefined && (w === undefined || n < w)) report(`tightened ${key} of ${label} from ${w ?? "none"} to ${n}`);
+  }
+  for (const key of FORMATS) {
+    if (now[key] !== undefined && now[key] !== was[key]) {
+      report(`${was[key] === undefined ? "added" : "changed"} the ${key} of ${label}`);
+    }
+  }
+}
+
+/** The JSON types a schema allows, across anyOf/oneOf members, sorted. */
+function typeSet(schema: JsonSchema): string[] {
   const types = new Set<string>();
   const visit = (s: JsonSchema) => {
     if (typeof s.type === "string") types.add(s.type);
@@ -91,14 +151,26 @@ function typesOf(schema: JsonSchema): string {
     [...(s.anyOf ?? []), ...(s.oneOf ?? [])].forEach(visit);
   };
   visit(schema);
-  return types.size > 0 ? [...types].sort().join("|") : "any";
+  return [...types].sort();
 }
 
 /** The schema itself, or its anyOf/oneOf member, that has the given type. */
-function part(schema: JsonSchema, type: "object" | "array"): JsonSchema | undefined {
+function part(schema: JsonSchema, type: string): JsonSchema | undefined {
   const has = (s: JsonSchema) => s.type === type || (Array.isArray(s.type) && s.type.includes(type));
   if (has(schema)) return schema;
   return [...(schema.anyOf ?? []), ...(schema.oneOf ?? [])].find(has);
+}
+
+/** An enum's values, or a const as one value, each as canonical JSON. */
+function valuesOf(schema: JsonSchema): string[] | undefined {
+  if (Array.isArray(schema.enum)) return schema.enum.map(canonical);
+  if ("const" in schema) return [canonical(schema.const)];
+  return undefined;
+}
+
+function numberAt(schema: JsonSchema, key: string): number | undefined {
+  const value = schema[key];
+  return typeof value === "number" ? value : undefined;
 }
 
 /** JSON with sorted keys, for comparing plain values. */

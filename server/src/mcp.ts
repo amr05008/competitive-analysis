@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
+import { SERVER_NAME, SERVER_VERSION } from "./config";
 import { outputObject } from "./contract/envelope";
 import { TOOLS, type ToolResult } from "./contract/tools";
 import { IMPLEMENTATIONS, render, type ToolDeps } from "./tools";
@@ -18,7 +19,7 @@ export function makeDeps(_env: Env): ToolDeps {
 
 export function buildServer(env: Env, _ctx: ExecutionContext): McpServer {
   const server = new McpServer(
-    { name: "competitive-analysis", version: "0.2.0" },
+    { name: SERVER_NAME, version: SERVER_VERSION },
     { jsonSchemaValidator: new CfWorkerJsonSchemaValidator() },
   );
   for (const tool of TOOLS) {
