@@ -43,14 +43,18 @@ async function depsFor(archive: ArchiveFetch, opts: { cache?: Cache; now?: () =>
 
 const schema = z.object(pageHistoryOutput);
 
-/** Runs the tool and checks the result against the published output schema. */
+/**
+ * Runs the tool and checks the result against the published output schema. The search tests are written
+ * for eight samples of twenty captures (0, 3, 5, 8, 11, 14, 16, 19), so the sample size is eight here;
+ * the default has its own test.
+ */
 async function call(
   input: PageHistoryInput,
   archive: ArchiveFetch,
   opts: { cache?: Cache; now?: () => number; maxFetches?: number; deadlineMs?: number } = {},
 ): Promise<PageHistoryResult> {
   const { maxFetches, deadlineMs, ...rest } = opts;
-  const result = await pageHistory(input, await depsFor(archive, rest), { maxFetches, deadlineMs });
+  const result = await pageHistory(input, await depsFor(archive, rest), { maxFetches, deadlineMs, sampleSize: 8 });
   expect(schema.safeParse(result).error).toBeUndefined();
   return result;
 }
@@ -113,6 +117,15 @@ describe("page_history: dating changes", () => {
     const r = await call({ ...JAN, max_changes: 15 }, fake);
     expect(r.changes).toHaveLength(15);
     expect(r.notes).toContain("1 more change not shown; call again with a narrower range");
+  });
+
+  it("samples sixteen captures by default before it bisects", async () => {
+    // On a six-year homepage history, eight samples sat nine months apart and hid whole positioning
+    // eras inside one bracket; earliest-first bisection never reached the later ones in two calls.
+    const fake = fakeArchive(copies(() => "Alpha", 31));
+    const r = await pageHistory(JAN, await depsFor(fake));
+    expect(r.status).toBe("ok");
+    expect(r.fetches_used).toBe(2 + 16);
   });
 
   it("works on the earliest bracket first", async () => {
@@ -240,8 +253,22 @@ describe("page_history: budget, deadline and failures", () => {
     const r = await call(JAN, slow, { now: () => t });
     expect(r.status).toBe("partial");
     expect(r.notes.some((n) => n.includes("time limit"))).toBe(true);
-    // Index queries end at 20 s; the first capture starts before 25 s, the second would start after.
+    // Index queries end at 20 s; the first capture starts before the 22 s deadline, the second would start after.
     expect(fake.calls).toHaveLength(3);
+  });
+
+  it("starts no capture fetch after 22 s, so a slow last answer still ends the call near 30 s", async () => {
+    let t = NOW;
+    const fake = fakeArchive(copies(() => "Alpha"));
+    // Every archive request takes six seconds: captures start at 12, 18 and 24 s.
+    const slow: ArchiveFetch = async (url, opts) => {
+      t += 6_000;
+      return fake(url, opts);
+    };
+    const r = await call(JAN, slow, { now: () => t });
+    expect(r.notes.some((n) => n.includes("time limit of 22 s"))).toBe(true);
+    // Two index queries and the captures started at 12 and 18 s; the one at 24 s never starts.
+    expect(fake.calls).toHaveLength(4);
   });
 
   it("a failed earliest-capture lookup is a note, and first_capture is null", async () => {

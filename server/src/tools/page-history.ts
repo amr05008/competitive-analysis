@@ -108,7 +108,7 @@ function middle(reads: (Read | undefined)[], i: number, j: number): number | nul
 }
 
 /**
- * Samples SAMPLE_SIZE captures evenly, then bisects between readable samples
+ * Samples `sampleSize` captures evenly, then bisects between readable samples
  * whose copy differs, earliest bracket first, until each change sits between
  * two captures with no readable one between them. Stops for good at the first
  * capture fetch the budget or deadline refuses, or the first archive failure;
@@ -121,6 +121,7 @@ async function findChanges(
   archive: ArchiveFetch,
   budget: Budget,
   maxFetches: number,
+  sampleSize: number,
 ): Promise<Search> {
   const n = captures.length;
   const reads: (Read | undefined)[] = new Array(n);
@@ -155,7 +156,7 @@ async function findChanges(
   const samples =
     n === 0
       ? []
-      : [...new Set(Array.from({ length: SAMPLE_SIZE }, (_, k) => Math.round((k * (n - 1)) / (SAMPLE_SIZE - 1))))];
+      : [...new Set(Array.from({ length: sampleSize }, (_, k) => Math.round((k * (n - 1)) / (sampleSize - 1))))];
   let sampled = 0;
   for (const i of samples) {
     if (!(await read(i))) break;
@@ -241,10 +242,11 @@ const shownKey = (fp: Fingerprint) => copyKey({ ...fp, description: "" });
 export async function pageHistory(
   input: PageHistoryInput,
   deps: ToolDeps,
-  opts: { maxFetches?: number; deadlineMs?: number } = {},
+  opts: { maxFetches?: number; deadlineMs?: number; sampleSize?: number } = {},
 ): Promise<PageHistoryResult> {
   const maxFetches = opts.maxFetches ?? PAGE_HISTORY_MAX_FETCHES;
   const deadlineMs = opts.deadlineMs ?? PAGE_HISTORY_DEADLINE_MS;
+  const sampleSize = Math.max(2, opts.sampleSize ?? SAMPLE_SIZE);
 
   const page = normalizePageUrl(input.url);
   if (!page.ok) return errorResult("bad_input", page.detail, [], deps.now());
@@ -289,7 +291,7 @@ export async function pageHistory(
   }
   if (!captures.length) notes.push(`no captures of this page between ${range.from} and ${range.to}`);
 
-  const search = await findChanges(captures, page.url, deps.cache, archive, budget, maxFetches);
+  const search = await findChanges(captures, page.url, deps.cache, archive, budget, maxFetches, sampleSize);
   const fpAt = (i: number) => (search.reads[i] as { fp: Fingerprint }).fp;
 
   if (search.stop) notes.push(stopNote(search.stop, maxFetches, deadlineMs));

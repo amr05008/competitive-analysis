@@ -22,12 +22,18 @@ export const TTL_FINGERPRINT = 31_536_000;
 /** The most bytes read from one archived capture. */
 export const CAPTURE_MAX_BYTES = 1_500_000;
 
-/** How many captures page_history reads first, spread evenly across the range. */
-export const SAMPLE_SIZE = 8;
+/**
+ * How many captures page_history reads first, spread evenly across the range. Sixteen puts a sample about
+ * every quarter on a multi-year range, so a positioning era shows before bisection spends the budget.
+ */
+export const SAMPLE_SIZE = 16;
 /** The most captures page_history fetches in one call; its two index queries aren't counted. */
 export const PAGE_HISTORY_MAX_FETCHES = 30;
-/** How long page_history may keep starting capture fetches, counted from the start of the call. */
-export const PAGE_HISTORY_DEADLINE_MS = 25_000;
+/**
+ * How long page_history may keep starting capture fetches, counted from the start of the call. The last
+ * capture can still take a gate wait (up to 1 s) and a slow archive answer (about 5 s), and the call targets 30 s.
+ */
+export const PAGE_HISTORY_DEADLINE_MS = 22_000;
 /** The most characters of JSON in one tool result. */
 export const RESPONSE_CAP_CHARS = 20_000;
 /** The most characters in one tool result's text rendering; the structured result carries the rest. */
