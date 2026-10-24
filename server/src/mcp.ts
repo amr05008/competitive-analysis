@@ -4,6 +4,7 @@ import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validatio
 import { SERVER_NAME, SERVER_VERSION } from "./config";
 import { outputObject } from "./contract/envelope";
 import { TOOLS, type ToolResult } from "./contract/tools";
+import { politeFetch } from "./shared/http";
 import { IMPLEMENTATIONS, render, type ToolDeps } from "./tools";
 
 export function makeDeps(_env: Env): ToolDeps {
@@ -11,7 +12,7 @@ export function makeDeps(_env: Env): ToolDeps {
     // Wrapped, not passed bare: workerd throws "Illegal invocation" when fetch
     // is called as a method of another object, as in deps.fetch(url).
     fetch: (input, init) => fetch(input, init),
-    archive: async (url) => ({ ok: false, reason: "source_unavailable", url, detail: "not built yet" }),
+    archive: (url, opts) => politeFetch((input, init) => fetch(input, init), url, opts),
     cache: caches.default,
     now: () => Date.now(),
   };

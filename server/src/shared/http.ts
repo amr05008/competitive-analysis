@@ -1,4 +1,5 @@
 import type { ErrorReason } from "../contract/envelope";
+import { USER_AGENT } from "../config";
 
 export type Fetcher = typeof fetch;
 
@@ -12,3 +13,81 @@ export type ArchiveFetch = (
   url: string,
   opts?: { timeoutMs?: number; maxBytes?: number },
 ) => Promise<FetchOutcome>;
+
+const DEFAULT_TIMEOUT_MS = 10_000;
+const DEFAULT_MAX_BYTES = 2_000_000;
+
+/** One GET with our user agent, a timeout and a body cap; failures come back as values, never throws. */
+export async function politeFetch(
+  fetcher: Fetcher,
+  url: string,
+  opts: { timeoutMs?: number; maxBytes?: number; accept?: string } = {},
+): Promise<FetchOutcome> {
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BYTES;
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  const fail = (reason: ErrorReason, detail: string, status?: number): FetchOutcome => ({
+    ok: false,
+    reason,
+    url,
+    detail,
+    ...(status === undefined ? {} : { status }),
+  });
+  try {
+    const headers: Record<string, string> = { "user-agent": USER_AGENT };
+    if (opts.accept) headers.accept = opts.accept;
+    const res = await fetcher(url, { headers, signal: controller.signal, redirect: "follow" });
+    if (res.status === 429) {
+      await res.body?.cancel();
+      return fail("source_rate_limited", "HTTP 429", 429);
+    }
+    if (res.status === 404) {
+      await res.body?.cancel();
+      return fail("not_found", "HTTP 404", 404);
+    }
+    if (!res.ok) {
+      await res.body?.cancel();
+      return fail("source_unavailable", `HTTP ${res.status}`, res.status);
+    }
+    const { text, truncated } = await readCapped(res, maxBytes);
+    return { ok: true, status: res.status, url, text, truncated };
+  } catch (e) {
+    if (timedOut) return fail("source_unavailable", `timeout after ${timeoutMs} ms`);
+    return fail("source_unavailable", `connection failed (${e instanceof Error ? e.name : "error"})`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function readCapped(res: Response, maxBytes: number): Promise<{ text: string; truncated: boolean }> {
+  if (!res.body) return { text: "", truncated: false };
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  let truncated = false;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (size + value.length > maxBytes) {
+      chunks.push(value.subarray(0, maxBytes - size));
+      size = maxBytes;
+      truncated = true;
+      await reader.cancel();
+      break;
+    }
+    chunks.push(value);
+    size += value.length;
+  }
+  const all = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    all.set(c, at);
+    at += c.length;
+  }
+  return { text: new TextDecoder().decode(all), truncated };
+}
