@@ -53,6 +53,42 @@ describe("MCP endpoint", () => {
     expect(result.serverInfo.version).toBe("0.2.0");
   });
 
+  const post = (body: string) =>
+    SELF.fetch("https://server.test/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+      body,
+    });
+  const message = (id: number, method: string) => ({ jsonrpc: "2.0", id, method });
+
+  it("refuses a JSON-RPC batch of two messages with HTTP 400 and a JSON-RPC error", async () => {
+    const res = await post(JSON.stringify([message(1, "tools/list"), message(2, "tools/list")]));
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { jsonrpc: string; error: { code: number; message: string }; id: null };
+    expect(body).toMatchObject({ jsonrpc: "2.0", id: null, error: { code: -32600 } });
+    expect(body.error.message).toMatch(/batch/i);
+  });
+
+  it("still answers a single message, read once and handed to the transport", async () => {
+    const res = await post(JSON.stringify(message(7, "tools/list")));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: number; result: { tools: unknown[] } };
+    expect(body.id).toBe(7);
+    expect(body.result.tools).toHaveLength(4);
+  });
+
+  it("answers a body that isn't JSON with a JSON-RPC parse error", async () => {
+    const res = await post("{not json");
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ jsonrpc: "2.0", id: null, error: { code: -32700 } });
+  });
+
+  it("refuses a body over 4 MB with 413, as the transport would", async () => {
+    const res = await post(JSON.stringify({ ...message(1, "tools/list"), pad: "x".repeat(4 * 1024 * 1024) }));
+    expect(res.status).toBe(413);
+    await res.body?.cancel();
+  });
+
   // One call per test, under the test cap of 3 calls a day. A built tool gets
   // input it refuses as bad_input before any fetch: tests never reach live sources.
   it.each([

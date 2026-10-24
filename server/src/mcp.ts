@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { DEFAULT_MAX_REQUEST_BODY_SIZE, readRequestBody, requestBodyTooLargeMessage } from "@modelcontextprotocol/sdk/server/requestBody.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
 import { SERVER_NAME, SERVER_VERSION } from "./config";
@@ -100,16 +101,28 @@ export function buildServer(env: Env, ctx: ExecutionContext): McpServer {
   return server;
 }
 
+const jsonRpcError = (status: number, code: number, message: string, headers?: HeadersInit): Response =>
+  Response.json({ jsonrpc: "2.0", error: { code, message }, id: null }, { status, headers });
+
 /** Stateless MCP over Streamable HTTP: a new server and transport per request. */
 export async function handleMcp(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   // A stateless server has no event stream to offer on GET and no session to
   // end on DELETE. 405 tells the client so; the transport would otherwise hold
   // a GET open as an idle event stream.
-  if (req.method !== "POST") {
-    return Response.json(
-      { jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed." }, id: null },
-      { status: 405, headers: { allow: "POST" } },
-    );
+  if (req.method !== "POST") return jsonRpcError(405, -32000, "Method not allowed.", { allow: "POST" });
+  // The body is read once, here, with the transport's own size limit and errors. A batch of more
+  // than one message is refused: protocol 2025-06-18 dropped batching, and one POST could otherwise
+  // run up to 100 tool calls. The transport gets the parsed body.
+  let parsed: unknown;
+  try {
+    const body = await readRequestBody(req, DEFAULT_MAX_REQUEST_BODY_SIZE);
+    if (body.tooLarge) return jsonRpcError(413, -32000, requestBodyTooLargeMessage(DEFAULT_MAX_REQUEST_BODY_SIZE));
+    parsed = JSON.parse(body.text);
+  } catch {
+    return jsonRpcError(400, -32700, "Parse error: Invalid JSON");
+  }
+  if (Array.isArray(parsed) && parsed.length > 1) {
+    return jsonRpcError(400, -32600, "Invalid Request: batches are not supported; send one message per request");
   }
   const server = buildServer(env, ctx);
   const transport = new WebStandardStreamableHTTPServerTransport({
@@ -117,5 +130,5 @@ export async function handleMcp(req: Request, env: Env, ctx: ExecutionContext): 
     enableJsonResponse: true,
   });
   await server.connect(transport);
-  return transport.handleRequest(req);
+  return transport.handleRequest(req, { parsedBody: parsed });
 }
