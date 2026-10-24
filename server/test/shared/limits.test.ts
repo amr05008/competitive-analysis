@@ -165,6 +165,20 @@ describe("Limits", () => {
       expect(String(spy.mock.calls[0][0])).toBe(url);
     });
 
+    it.each<[string, () => DurableObjectStub]>([
+      ["rejects", () => ({ archiveFetch: () => Promise.reject(new Error("Durable Object reset because its code was updated")) }) as unknown as DurableObjectStub],
+      ["can't be reached", () => { throw new Error("Durable Object is overloaded"); }],
+    ])("makeDeps's archive returns server_busy, never a rejection, when the gate %s", async (_kind, get) => {
+      const LIMITS = { idFromName: () => ({}), get } as unknown as Env["LIMITS"];
+      const url = "https://web.archive.org/a";
+      expect(await makeDeps({ ...env, LIMITS }).archive(url)).toEqual({
+        ok: false,
+        reason: "server_busy",
+        url,
+        detail: "the archive gate is unavailable",
+      });
+    });
+
     it("makeDeps's archive goes through the global object's gate", async () => {
       const spy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response("", { status: 429 }));
       const { archive } = makeDeps(env);

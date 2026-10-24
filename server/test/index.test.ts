@@ -135,6 +135,17 @@ describe("runTool", () => {
     expect(calls.record).toEqual([["job_openings", "source_rate_limited", false]]);
   });
 
+  it("a tool that throws returns source_unavailable, with nothing from the error, and is recorded", async () => {
+    tool.mockRejectedValue(new Error("parse failed on https://example.com/secret"));
+    const { env: e, calls } = withLimits({});
+    const ctx = createExecutionContext();
+    const result = await runTool("job_openings", INPUT, e, ctx, { selfCheck: false });
+    await waitOnExecutionContext(ctx);
+    expect(result).toEqual(errorResult("source_unavailable", "the tool failed unexpectedly", [], Date.now()));
+    expect(JSON.stringify(result)).not.toContain("example.com");
+    expect(calls.record).toEqual([["job_openings", "source_unavailable", false]]);
+  });
+
   it("returns without waiting for record", async () => {
     const { env: e, calls } = withLimits({ record: () => new Promise<void>(() => {}) });
     expect(await runTool("job_openings", INPUT, e, createExecutionContext(), { selfCheck: false })).toBe(PARTIAL);

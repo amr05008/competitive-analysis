@@ -147,6 +147,13 @@ describe("ArchiveGate", () => {
     ["HTTP 500", (c) => c.respond(new Response("", { status: 500 })), "source_unavailable", "HTTP 500", undefined],
     ["HTTP 404", (c) => c.respond(new Response("", { status: 404 })), "not_found", "HTTP 404", undefined],
     ["a timeout", () => {}, "source_unavailable", "timeout", 20],
+    [
+      "a failure whose detail mentions a connection",
+      (c) => c.respond(new Response(null, { status: 302, headers: { location: "http://connection.internal/" } })),
+      "source_unavailable",
+      "redirect to a disallowed host: connection.internal",
+      undefined,
+    ],
   ])("%s is passed through and starts no cooldown", async (_kind, answer, reason, detail, timeoutMs) => {
     const h = harness();
     const first = h.gate.run(A, { timeoutMs });

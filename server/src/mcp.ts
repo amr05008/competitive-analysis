@@ -4,6 +4,7 @@ import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validatio
 import { SERVER_NAME, SERVER_VERSION } from "./config";
 import { errorResult, outputObject } from "./contract/envelope";
 import { TOOLS, type ToolName, type ToolResult } from "./contract/tools";
+import type { FetchOutcome } from "./shared/http";
 import { limitsStub } from "./shared/limits";
 import { outcomeOf } from "./shared/usage-store";
 import { IMPLEMENTATIONS, render, type ToolDeps } from "./tools";
@@ -13,8 +14,15 @@ export function makeDeps(env: Env): ToolDeps {
     // Wrapped, not passed bare: workerd throws "Illegal invocation" when fetch
     // is called as a method of another object, as in deps.fetch(url).
     fetch: (input, init) => fetch(input, init),
-    // Every archive request goes through the one server-wide gate.
-    archive: (url, opts) => limitsStub(env).archiveFetch(url, opts),
+    // Every archive request goes through the one server-wide gate. Like
+    // politeFetch, it never rejects: an unreachable gate is server_busy.
+    archive: async (url, opts): Promise<FetchOutcome> => {
+      try {
+        return await limitsStub(env).archiveFetch(url, opts);
+      } catch {
+        return { ok: false, reason: "server_busy", url, detail: "the archive gate is unavailable" };
+      }
+    },
     cache: caches.default,
     now: () => Date.now(),
   };
@@ -44,7 +52,15 @@ export async function runTool(
   // Inputs arrive checked against the tool's input schema: by the SDK for MCP
   // calls, and written in code for the self-check.
   const implementation = IMPLEMENTATIONS[name] as (input: unknown, deps: ToolDeps) => Promise<ToolResult>;
-  const result = await implementation(input, makeDeps(env));
+  const deps = makeDeps(env);
+  let result: ToolResult;
+  try {
+    result = await implementation(input, deps);
+  } catch {
+    // Tools return failures as values; a throw is a bug. Its message may hold
+    // the input, so it stays out of the result.
+    result = errorResult("source_unavailable", "the tool failed unexpectedly", [], deps.now());
+  }
   const recording = (async () => limits.record(name, outcomeOf(result), opts.selfCheck))().catch(() => {});
   ctx.waitUntil(recording);
   return result;

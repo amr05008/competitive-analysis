@@ -2,11 +2,12 @@ import { ARCHIVE_COOLDOWN_MS, ARCHIVE_GAP_MS, ARCHIVE_MAX_QUEUE } from "../confi
 import { politeFetch, type ArchiveFetch, type FailedOutcome, type FetchOutcome, type Fetcher } from "./http";
 
 /**
- * A refusal: a 429, a 503, or a connection that was refused or dropped. A
- * timeout or another error status is a plain failure, not a refusal.
+ * A refusal: a 429, a 503, or a connection that was refused or dropped
+ * (politeFetch's "connection failed (...)"). A timeout or another error status
+ * is a plain failure, not a refusal.
  */
 function isRefusal(out: FailedOutcome): boolean {
-  return out.reason === "source_rate_limited" || out.status === 503 || out.detail.includes("connection");
+  return out.reason === "source_rate_limited" || out.status === 503 || out.detail.startsWith("connection failed");
 }
 
 /**
