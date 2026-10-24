@@ -1,0 +1,1096 @@
+{
+  "tools": [
+    {
+      "name": "page_history",
+      "title": "Page history",
+      "description": "Finds when a company web page's copy changed, using Wayback Machine captures. Give a page URL, such as a homepage or pricing page, and optionally a month range. Returns the page's earliest capture and each change, bracketed between two dated captures, with the title, headline, subheadings and prices before and after, each with a link.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The company page to check, such as https://example.com/pricing."
+          },
+          "from": {
+            "description": "The first month to search, as YYYY-MM; defaults to 24 months before to.",
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}$"
+          },
+          "to": {
+            "description": "The last month to search, as YYYY-MM; defaults to this month.",
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}$"
+          },
+          "max_changes": {
+            "description": "The most changes to return, from 1 to 15; defaults to 10.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 15
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "partial",
+              "error"
+            ],
+            "description": "ok when the check finished, partial when some of it is missing, and error when it failed."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Notes on the result, such as what a partial result is missing."
+          },
+          "retrieved_at": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "The UTC date this result was produced, as YYYY-MM-DD."
+          },
+          "error": {
+            "description": "Why the check failed, present only when status is error.",
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "source_rate_limited",
+                  "source_unavailable",
+                  "server_busy",
+                  "not_found",
+                  "bad_input"
+                ],
+                "description": "The kind of failure."
+              },
+              "detail": {
+                "type": "string",
+                "description": "A short description of what went wrong."
+              },
+              "tried": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The sources or addresses that were tried."
+              },
+              "fallback": {
+                "type": "string",
+                "const": "fall back to browsing for this check.",
+                "description": "What to do instead."
+              }
+            },
+            "required": [
+              "reason",
+              "detail",
+              "tried",
+              "fallback"
+            ],
+            "additionalProperties": {}
+          },
+          "url": {
+            "description": "The page address that was checked, normalized.",
+            "type": "string"
+          },
+          "range": {
+            "description": "The months that were searched.",
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "description": "The first month searched, as YYYY-MM."
+              },
+              "to": {
+                "type": "string",
+                "description": "The last month searched, as YYYY-MM."
+              }
+            },
+            "required": [
+              "from",
+              "to"
+            ],
+            "additionalProperties": {}
+          },
+          "first_capture": {
+            "description": "The page's earliest capture on the Wayback Machine, or null when it couldn't be read.",
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "timestamp": {
+                    "type": "string",
+                    "description": "The capture's Wayback Machine timestamp, as YYYYMMDDhhmmss."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The date of the capture, as YYYY-MM-DD."
+                  },
+                  "link": {
+                    "type": "string",
+                    "description": "A link to the capture on the Wayback Machine."
+                  }
+                },
+                "required": [
+                  "timestamp",
+                  "date",
+                  "link"
+                ],
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "captures_in_range": {
+            "description": "How many distinct captures of the page fall in the months searched.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "changes": {
+            "description": "Each change in the page's copy, bracketed between two dated captures.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "before": {
+                  "type": "object",
+                  "properties": {
+                    "timestamp": {
+                      "type": "string",
+                      "description": "The capture's Wayback Machine timestamp, as YYYYMMDDhhmmss."
+                    },
+                    "date": {
+                      "type": "string",
+                      "description": "The date of the capture, as YYYY-MM-DD."
+                    },
+                    "link": {
+                      "type": "string",
+                      "description": "A link to the capture on the Wayback Machine."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "The page's title at this capture."
+                    },
+                    "headline": {
+                      "type": "string",
+                      "description": "The page's main heading at this capture."
+                    },
+                    "subheadings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The page's section headings at this capture."
+                    },
+                    "prices": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Prices shown on the page at this capture, each with a few words before it."
+                    }
+                  },
+                  "required": [
+                    "timestamp",
+                    "date",
+                    "link",
+                    "title",
+                    "headline",
+                    "subheadings",
+                    "prices"
+                  ],
+                  "additionalProperties": {},
+                  "description": "The last capture checked before the change."
+                },
+                "after": {
+                  "type": "object",
+                  "properties": {
+                    "timestamp": {
+                      "type": "string",
+                      "description": "The capture's Wayback Machine timestamp, as YYYYMMDDhhmmss."
+                    },
+                    "date": {
+                      "type": "string",
+                      "description": "The date of the capture, as YYYY-MM-DD."
+                    },
+                    "link": {
+                      "type": "string",
+                      "description": "A link to the capture on the Wayback Machine."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "The page's title at this capture."
+                    },
+                    "headline": {
+                      "type": "string",
+                      "description": "The page's main heading at this capture."
+                    },
+                    "subheadings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The page's section headings at this capture."
+                    },
+                    "prices": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Prices shown on the page at this capture, each with a few words before it."
+                    }
+                  },
+                  "required": [
+                    "timestamp",
+                    "date",
+                    "link",
+                    "title",
+                    "headline",
+                    "subheadings",
+                    "prices"
+                  ],
+                  "additionalProperties": {},
+                  "description": "The first capture checked after the change."
+                },
+                "days_between": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Days between the two captures; the change happened in that window."
+                },
+                "resolved": {
+                  "type": "boolean",
+                  "description": "Whether no capture between the two is left to check, so the change can't be dated more closely."
+                }
+              },
+              "required": [
+                "before",
+                "after",
+                "days_between",
+                "resolved"
+              ],
+              "additionalProperties": {}
+            }
+          },
+          "fetches_used": {
+            "description": "How many Wayback Machine requests this call made; answers already cached cost none.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "status",
+          "notes",
+          "retrieved_at"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "job_openings",
+      "title": "Job openings",
+      "description": "Lists a company's open roles from its public job board (Greenhouse, Lever or Ashby). Give the company's domain, and optionally its name. Returns the board, role counts by department and location, and the roles with dates, links and pay ranges where the board publishes them, or says that no public board was found and lists what was tried. Pass role_ids to get full descriptions of specific roles.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "The company's website domain, such as example.com."
+          },
+          "company_name": {
+            "description": "The company's name, used to find its board when the name differs from the domain.",
+            "type": "string"
+          },
+          "role_ids": {
+            "description": "Up to five role ids from an earlier call, to get those roles' full descriptions.",
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "partial",
+              "error"
+            ],
+            "description": "ok when the check finished, partial when some of it is missing, and error when it failed."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Notes on the result, such as what a partial result is missing."
+          },
+          "retrieved_at": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "The UTC date this result was produced, as YYYY-MM-DD."
+          },
+          "error": {
+            "description": "Why the check failed, present only when status is error.",
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "source_rate_limited",
+                  "source_unavailable",
+                  "server_busy",
+                  "not_found",
+                  "bad_input"
+                ],
+                "description": "The kind of failure."
+              },
+              "detail": {
+                "type": "string",
+                "description": "A short description of what went wrong."
+              },
+              "tried": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The sources or addresses that were tried."
+              },
+              "fallback": {
+                "type": "string",
+                "const": "fall back to browsing for this check.",
+                "description": "What to do instead."
+              }
+            },
+            "required": [
+              "reason",
+              "detail",
+              "tried",
+              "fallback"
+            ],
+            "additionalProperties": {}
+          },
+          "board": {
+            "description": "The public job board that was found, or null when none was.",
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "ats": {
+                    "type": "string",
+                    "enum": [
+                      "greenhouse",
+                      "lever",
+                      "ashby"
+                    ],
+                    "description": "The service that hosts the board."
+                  },
+                  "slug": {
+                    "type": "string",
+                    "description": "The company's board name on that service."
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "A link to the board."
+                  }
+                },
+                "required": [
+                  "ats",
+                  "slug",
+                  "url"
+                ],
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "no_public_board_found": {
+            "description": "True only when every board and careers page checked showed no board; a check that failed never counts.",
+            "type": "boolean"
+          },
+          "tried": {
+            "description": "The board and careers-page addresses that were checked.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "counts": {
+            "description": "Open-role counts across the whole board.",
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "How many open roles the board lists."
+              },
+              "by_department": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The department or location, or Unspecified when the board gives none."
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "How many open roles it has."
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "count"
+                  ],
+                  "additionalProperties": {}
+                },
+                "description": "Open roles per department, most first."
+              },
+              "by_location": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The department or location, or Unspecified when the board gives none."
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "How many open roles it has."
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "count"
+                  ],
+                  "additionalProperties": {}
+                },
+                "description": "Open roles per location, most first."
+              }
+            },
+            "required": [
+              "total",
+              "by_department",
+              "by_location"
+            ],
+            "additionalProperties": {}
+          },
+          "roles": {
+            "description": "The open roles, newest first, or only the roles asked for by role_ids.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The role's id on the board, to pass in role_ids."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The role's title."
+                },
+                "department": {
+                  "description": "The role's department, or null when the board gives none.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "location": {
+                  "description": "The role's location, or null when the board gives none.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "date": {
+                  "description": "The date the board gives for the role, or null when it gives none.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "date_kind": {
+                  "type": "string",
+                  "enum": [
+                    "posted",
+                    "updated"
+                  ],
+                  "description": "Whether date is when the role was posted or last updated."
+                },
+                "pay": {
+                  "description": "The pay range as the board publishes it, or null when it doesn't.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "link": {
+                  "type": "string",
+                  "description": "A link to the role's posting."
+                },
+                "description": {
+                  "description": "The role's full description as plain text, present only for roles asked for by role_ids.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "department",
+                "location",
+                "date",
+                "date_kind",
+                "pay",
+                "link"
+              ],
+              "additionalProperties": {}
+            }
+          }
+        },
+        "required": [
+          "status",
+          "notes",
+          "retrieved_at"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "hacker_news_mentions",
+      "title": "Hacker News mentions",
+      "description": "Counts Hacker News stories and comments that mention a company or product, by calendar year, and lists the threads with the most points. Give the company or product name, and optionally its domain to count stories that link to its site. Includes a few story titles per year so name collisions are easy to spot. Never returns usernames.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 80,
+            "description": "The company or product name to search for."
+          },
+          "domain": {
+            "description": "The company's website domain, to also count stories that link to it.",
+            "type": "string"
+          },
+          "years": {
+            "description": "How many calendar years to count, ending with this one, from 1 to 10; defaults to 6.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "partial",
+              "error"
+            ],
+            "description": "ok when the check finished, partial when some of it is missing, and error when it failed."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Notes on the result, such as what a partial result is missing."
+          },
+          "retrieved_at": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "The UTC date this result was produced, as YYYY-MM-DD."
+          },
+          "error": {
+            "description": "Why the check failed, present only when status is error.",
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "source_rate_limited",
+                  "source_unavailable",
+                  "server_busy",
+                  "not_found",
+                  "bad_input"
+                ],
+                "description": "The kind of failure."
+              },
+              "detail": {
+                "type": "string",
+                "description": "A short description of what went wrong."
+              },
+              "tried": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The sources or addresses that were tried."
+              },
+              "fallback": {
+                "type": "string",
+                "const": "fall back to browsing for this check.",
+                "description": "What to do instead."
+              }
+            },
+            "required": [
+              "reason",
+              "detail",
+              "tried",
+              "fallback"
+            ],
+            "additionalProperties": {}
+          },
+          "query": {
+            "description": "The name that was searched for.",
+            "type": "string"
+          },
+          "years": {
+            "description": "Mention counts for each calendar year.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "year": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991,
+                  "description": "The calendar year."
+                },
+                "stories": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "How many stories that year mention the name."
+                },
+                "comments": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "How many comments that year mention the name."
+                },
+                "stories_linking_domain": {
+                  "description": "How many stories that year link to the domain, present only when a domain was given.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "sample_titles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "A few story titles from that year, to spot stories about something else with the same name."
+                },
+                "search_link": {
+                  "type": "string",
+                  "description": "A link to that year's search on Hacker News search."
+                }
+              },
+              "required": [
+                "year",
+                "stories",
+                "comments",
+                "sample_titles",
+                "search_link"
+              ],
+              "additionalProperties": {}
+            }
+          },
+          "top_threads": {
+            "description": "The stories mentioning the name that have the most points.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The story's title."
+                },
+                "points": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "The story's points."
+                },
+                "comments": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "How many comments the story has."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "The date the story was posted, as YYYY-MM-DD."
+                },
+                "hn_link": {
+                  "type": "string",
+                  "description": "A link to the story's discussion on Hacker News."
+                },
+                "story_link": {
+                  "description": "The address the story links to, or null for a text post such as Ask HN.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "title",
+                "points",
+                "comments",
+                "date",
+                "hn_link",
+                "story_link"
+              ],
+              "additionalProperties": {}
+            }
+          }
+        },
+        "required": [
+          "status",
+          "notes",
+          "retrieved_at"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "sec_filings",
+      "title": "SEC filings",
+      "description": "Looks up a company's filings with the SEC on EDGAR, especially Form D notices of private fundraising. Give the company name, and optionally its domain or two-letter state. Returns matching companies, their filings with dates and links, and for each Form D the offering amount, amount sold and date of first sale. Says plainly when nothing is filed under the names tried. Returns companies only, never people.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "company_name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120,
+            "description": "The company's name, such as Example Inc."
+          },
+          "domain": {
+            "description": "The company's website domain, whose first label is tried as a second name.",
+            "type": "string"
+          },
+          "state": {
+            "description": "The company's two-letter US state, used to rank matching companies first.",
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          }
+        },
+        "required": [
+          "company_name"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "partial",
+              "error"
+            ],
+            "description": "ok when the check finished, partial when some of it is missing, and error when it failed."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Notes on the result, such as what a partial result is missing."
+          },
+          "retrieved_at": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "The UTC date this result was produced, as YYYY-MM-DD."
+          },
+          "error": {
+            "description": "Why the check failed, present only when status is error.",
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "source_rate_limited",
+                  "source_unavailable",
+                  "server_busy",
+                  "not_found",
+                  "bad_input"
+                ],
+                "description": "The kind of failure."
+              },
+              "detail": {
+                "type": "string",
+                "description": "A short description of what went wrong."
+              },
+              "tried": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The sources or addresses that were tried."
+              },
+              "fallback": {
+                "type": "string",
+                "const": "fall back to browsing for this check.",
+                "description": "What to do instead."
+              }
+            },
+            "required": [
+              "reason",
+              "detail",
+              "tried",
+              "fallback"
+            ],
+            "additionalProperties": {}
+          },
+          "names_tried": {
+            "description": "The company names that were searched on EDGAR.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "entities": {
+            "description": "The companies on EDGAR that match the names tried; companies only, never people.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The company's name on EDGAR."
+                },
+                "cik": {
+                  "type": "string",
+                  "description": "The company's EDGAR id, its CIK."
+                },
+                "state": {
+                  "description": "The company's state on EDGAR, or null when none is listed.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "former_names": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Names the company filed under before."
+                },
+                "exact_match": {
+                  "type": "boolean",
+                  "description": "Whether the EDGAR name matches the name asked for, ignoring case, punctuation and legal suffixes."
+                },
+                "edgar_link": {
+                  "type": "string",
+                  "description": "A link to the company's filings on EDGAR."
+                },
+                "filings": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "form": {
+                        "type": "string",
+                        "description": "The form type, such as D or 10-K."
+                      },
+                      "date": {
+                        "type": "string",
+                        "description": "The filing date, as YYYY-MM-DD."
+                      },
+                      "link": {
+                        "type": "string",
+                        "description": "A link to the filing on EDGAR."
+                      }
+                    },
+                    "required": [
+                      "form",
+                      "date",
+                      "link"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  "description": "The company's most recent filings, newest first."
+                },
+                "form_d": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "date_filed": {
+                        "type": "string",
+                        "description": "The date the notice was filed, as YYYY-MM-DD."
+                      },
+                      "link": {
+                        "type": "string",
+                        "description": "A link to the notice on EDGAR."
+                      },
+                      "amendment": {
+                        "type": "boolean",
+                        "description": "Whether the notice amends an earlier one."
+                      },
+                      "total_offering_amount": {
+                        "description": "The total offering amount as filed, in US dollars or Indefinite, or null when not given.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "total_amount_sold": {
+                        "description": "The total amount sold as filed, in US dollars, or null when not given.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "date_of_first_sale": {
+                        "description": "The date of first sale, as YYYY-MM-DD, or null when it hasn't happened or isn't given.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "industry_group": {
+                        "description": "The industry group named in the notice, or null when not given.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "year_of_incorporation": {
+                        "description": "The year of incorporation, or over five years or within five years, or null when not given.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "date_filed",
+                      "link",
+                      "amendment",
+                      "total_offering_amount",
+                      "total_amount_sold",
+                      "date_of_first_sale",
+                      "industry_group",
+                      "year_of_incorporation"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  "description": "Figures from the company's Form D notices of private fundraising."
+                }
+              },
+              "required": [
+                "name",
+                "cik",
+                "state",
+                "former_names",
+                "exact_match",
+                "edgar_link",
+                "filings",
+                "form_d"
+              ],
+              "additionalProperties": {}
+            }
+          },
+          "statement": {
+            "description": "A plain statement when nothing is filed under the names tried, otherwise null.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "notes",
+          "retrieved_at"
+        ],
+        "additionalProperties": {}
+      }
+    }
+  ]
+}

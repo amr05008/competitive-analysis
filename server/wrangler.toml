@@ -1,0 +1,16 @@
+# Top level is the dev environment; tests use it too.
+name = "competitive-analysis-dev"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+workers_dev = false
+preview_urls = false
+
+# Never log tool inputs.
+[observability]
+enabled = false
+
+[vars]
+ENVIRONMENT = "dev"
+DAILY_TOOL_CALL_CAP = "200"

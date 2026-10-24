@@ -35,6 +35,9 @@ Not" (renamed 2026-10-11); plans and session logs keep the old name as history.
   run log. It exists only on Aaron's Macs, and the files are committed in the vault repo, not
   here. Moved out of this public repo on 2026-10-20, and the server design was removed from
   its history.
+- `server/`: the plugin's MCP server (Cloudflare Worker). Public code, never in the zip. The
+  tool contract in `server/src/contract/` changes additively only, and `npm test` enforces
+  it. Never log tool inputs.
 - Each uploaded zip's commit is tagged `v<version>`. The build refuses to zip a tagged
   version from different files.
 - This repo is Aaron's only public competitive-analysis plugin. The February 2026 Claude
