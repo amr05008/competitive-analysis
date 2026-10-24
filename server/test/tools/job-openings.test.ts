@@ -6,7 +6,7 @@ import { jobOpeningsOutput, type JobOpeningsInput, type JobOpeningsResult } from
 import { callDeps, render, type ToolDeps } from "../../src/tools";
 import { jobOpenings, renderJobOpenings } from "../../src/tools/job-openings";
 import { Subrequests } from "../../src/shared/subrequests";
-import { fakeFetch, type FakeFetch, type Route } from "../helpers/fake-fetch";
+import { fakeFetch, hangingOn, type FakeFetch, type Route } from "../helpers/fake-fetch";
 import { meter } from "../helpers/meter";
 import careersAshby from "../fixtures/boards/careers-ashby-link.html?raw";
 import ghDepartments from "../fixtures/boards/greenhouse-stripe-departments.json";
@@ -246,6 +246,19 @@ describe("job_openings: budget", () => {
     expect(result.status).toBe("partial");
     expect(result.no_public_board_found).toBe(false);
     expect(result.notes.join(" ")).toMatch(/time limit/);
+  });
+});
+
+describe("job_openings: hard deadline", () => {
+  it("cuts a board read still running at the hard deadline: partial, and never absence", async () => {
+    const fetch = hangingOn(fakeFetch({}), ashbyApi("acme"));
+    const result = await jobOpenings({ domain: "acme.io" }, await depsFor(fetch), { hardDeadlineMs: 50 });
+    expect(schema.safeParse(result).error).toBeUndefined();
+    expect(result.status).toBe("partial");
+    expect(result.no_public_board_found).toBe(false);
+    expect(result.notes.join(" ")).toMatch(/time limit of \d+ s reached/);
+    expect(result.notes.join(" ")).not.toMatch(/connection failed|could not be checked/);
+    expect(fetch.calls).toEqual([gh("acme"), ashbyApi("acme")]);
   });
 });
 

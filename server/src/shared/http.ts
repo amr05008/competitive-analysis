@@ -17,9 +17,13 @@ export type FailedOutcome = Extract<FetchOutcome, { ok: false }>;
  */
 export const REFUSED_STATUS = 599;
 
+/**
+ * One Wayback Machine request through the server-wide gate. With `startBy` (an absolute time in ms), the
+ * gate answers server_busy with REFUSED_STATUS instead of starting the request after that moment.
+ */
 export type ArchiveFetch = (
   url: string,
-  opts?: { timeoutMs?: number; maxBytes?: number },
+  opts?: { timeoutMs?: number; maxBytes?: number; startBy?: number },
 ) => Promise<FetchOutcome>;
 
 const DEFAULT_TIMEOUT_MS = 10_000;

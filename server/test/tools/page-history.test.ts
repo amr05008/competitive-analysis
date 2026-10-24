@@ -331,6 +331,56 @@ describe("page_history: budget, deadline and failures", () => {
     expect(fake.calls).toHaveLength(4);
   });
 
+  it("cuts a capture still running at the hard deadline and returns what's done as partial", async () => {
+    const fake = fakeArchive(copies((i) => (i < 13 ? "Alpha" : "Bravo")));
+    // Samples are read 0, 19, 8, …; the archive never answers for capture 8.
+    const stuck: ArchiveFetch = (url, opts) => (url.includes(`/web/${ts(8)}id_/`) ? new Promise(() => {}) : fake(url, opts));
+    const r = await pageHistory(JAN, await depsFor(stuck), { sampleSize: 8, hardDeadlineMs: 50 });
+    expect(schema.safeParse(r).error).toBeUndefined();
+    expect(r.status).toBe("partial");
+    expect(pairs(r)).toEqual([[ts(0), ts(19)]]);
+    expect(r.notes.some((n) => /^time limit of \d+ s reached/.test(n))).toBe(true);
+    expect(r.notes.join(" ")).not.toContain("archive refused");
+  });
+
+  it("asks the archive gate to start every request by the 22 s mark", async () => {
+    const fake = fakeArchive(copies((i) => (i < 13 ? "Alpha" : "Bravo")));
+    const seen: (number | undefined)[] = [];
+    const watched: ArchiveFetch = (url, opts) => {
+      seen.push(opts?.startBy);
+      return fake(url, opts);
+    };
+    await call(JAN, watched);
+    expect(seen.length).toBe(12);
+    expect(new Set(seen)).toEqual(new Set([NOW + 22_000]));
+  });
+
+  it("a request the archive queue would start too late stops the call as a time limit", async () => {
+    const fake = fakeArchive(copies(() => "Alpha"));
+    const late: ArchiveFetch = async (url, opts) =>
+      url.includes(`/web/${ts(8)}id_/`)
+        ? { ok: false, reason: "server_busy", status: 599, url, detail: "the archive queue would start this request too late" }
+        : fake(url, opts);
+    const r = await call(JAN, late);
+    expect(r.status).toBe("partial");
+    expect(r.notes.some((n) => n.startsWith("time limit of"))).toBe(true);
+    expect(r.notes.join(" ")).not.toContain("archive refused");
+  });
+
+  it("starts no index query after 22 s", async () => {
+    let t = NOW;
+    const fake = fakeArchive(copies(() => "Alpha"));
+    const slow: ArchiveFetch = async (url, opts) => {
+      t += 23_000;
+      return fake(url, opts);
+    };
+    const r = await call(JAN, slow, { now: () => t });
+    expect(r.status).toBe("error");
+    expect(r.error?.reason).toBe("server_busy");
+    expect(r.error?.detail).toContain("time limit of 22 s");
+    expect(fake.calls).toHaveLength(1);
+  });
+
   it("a failed earliest-capture lookup is a note, and first_capture is null", async () => {
     const fake = fakeArchive({ ...copies((i) => (i < 13 ? "Alpha" : "Bravo")), failAt: 1 });
     const r = await call(JAN, fake);

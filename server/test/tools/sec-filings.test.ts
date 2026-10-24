@@ -5,7 +5,7 @@ import { secOutput, type SecInput, type SecResult } from "../../src/contract/too
 import { callDeps, render, type ToolDeps } from "../../src/tools";
 import { renderSec, secFilings } from "../../src/tools/sec-filings";
 import { Subrequests } from "../../src/shared/subrequests";
-import { fakeFetch, type FakeFetch, type Route } from "../helpers/fake-fetch";
+import { fakeFetch, hangingOn, type FakeFetch, type Route } from "../helpers/fake-fetch";
 import { meter } from "../helpers/meter";
 import searchStripe from "../fixtures/edgar/search-stripe.json";
 import searchEmpty from "../fixtures/edgar/search-hightouch-empty.json";
@@ -413,6 +413,16 @@ describe("sec_filings", () => {
     expect(result.status).toBe("partial");
     expect(result.notes.join(" ")).toContain("time limit of 18 s");
     expect(inner.calls).toHaveLength(3);
+  });
+
+  it("cuts a request still running at the hard deadline and returns what was read as partial", async () => {
+    const fetch = hangingOn(fakeFetch(stripeRoutes()), STRIPE_D);
+    const result = await secFilings({ company_name: "Stripe" }, await deps(fetch), { sleep: async () => {}, hardDeadlineMs: 50 });
+    expect(schema.safeParse(result).error).toBeUndefined();
+    expect(result.status).toBe("partial");
+    expect(result.entities?.[0].name).toBe("Stripe, Inc.");
+    expect(result.notes.join(" ")).toMatch(/5 Form D notices were not read: time limit of \d+ s reached/);
+    expect(result.notes.join(" ")).not.toMatch(/could not be read|connection failed/);
   });
 
   it("shortens lists to fit the response size", async () => {

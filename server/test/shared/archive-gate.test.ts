@@ -143,6 +143,44 @@ describe("ArchiveGate", () => {
     expect(h.calls).toHaveLength(1);
   });
 
+  describe("startBy", () => {
+    const TOO_LATE = { ok: false, reason: "server_busy", status: 599, detail: "the archive queue would start this request too late" };
+
+    it("refuses a request whose turn comes after startBy, without fetching it", async () => {
+      const h = harness();
+      const first = h.gate.run(A);
+      const late = h.gate.run(B, { startBy: 1_000_000 + 2_000 });
+      await h.reached(1);
+      h.advance(5_000); // the first request is slow
+      h.calls[0].respond(new Response("ok"));
+      expect(await first).toMatchObject({ ok: true });
+      expect(await late).toMatchObject({ ...TOO_LATE, url: B });
+      await settle();
+      expect(h.calls).toHaveLength(1);
+    });
+
+    it("refuses a turn whose gap wait would end after startBy, without waiting", async () => {
+      const h = harness();
+      const first = h.gate.run(A);
+      await h.reached(1);
+      h.calls[0].respond(new Response("ok"));
+      await first;
+      // The next start may come 1000 ms after the first; startBy is 500 ms after it.
+      expect(await h.gate.run(B, { startBy: 1_000_000 + 500 })).toMatchObject({ ...TOO_LATE, url: B });
+      expect(h.calls).toHaveLength(1);
+    });
+
+    it("runs a request whose turn comes by startBy, and a startBy already past is refused at once", async () => {
+      const h = harness();
+      const onTime = h.gate.run(A, { startBy: 1_000_000 + 10_000 });
+      await h.reached(1);
+      h.calls[0].respond(new Response("ok"));
+      expect(await onTime).toMatchObject({ ok: true, url: A });
+      expect(await h.gate.run(B, { startBy: 999_999 })).toMatchObject({ ...TOO_LATE, url: B });
+      expect(h.calls).toHaveLength(1);
+    });
+  });
+
   it.each<[string, (c: Call) => void, string, string, number | undefined]>([
     ["HTTP 500", (c) => c.respond(new Response("", { status: 500 })), "source_unavailable", "HTTP 500", undefined],
     ["HTTP 404", (c) => c.respond(new Response("", { status: 404 })), "not_found", "HTTP 404", undefined],

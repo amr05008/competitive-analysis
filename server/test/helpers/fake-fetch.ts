@@ -21,3 +21,20 @@ export function fakeFetch(routes: Record<string, Route>): FakeFetch {
   fetcher.calls = calls;
   return fetcher;
 }
+
+/**
+ * `fetch`, except that a request for `url` hangs until its signal aborts, then rejects with the
+ * signal's reason, as a real fetch does. It is recorded in `calls` like any other.
+ */
+export function hangingOn(fetch: FakeFetch, url: string): FakeFetch {
+  const hanging = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const target = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    if (target !== url) return fetch(input, init);
+    fetch.calls.push(target);
+    return new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+    });
+  }) as FakeFetch;
+  hanging.calls = fetch.calls;
+  return hanging;
+}

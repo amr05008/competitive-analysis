@@ -40,6 +40,11 @@ export const PAGE_HISTORY_DEADLINE_MS = 22_000;
  * Discord posts. Raise SUBREQUEST_LIMIT to about 900 on the paid plan.
  */
 export const DEFAULT_SUBREQUEST_LIMIT = 45;
+/**
+ * The longest any tool call runs, from its start. Each tool stops starting requests earlier (its own
+ * deadline); at this one, a request still running is cut and the call returns what it has.
+ */
+export const TOOL_HARD_DEADLINE_MS = 28_000;
 /** The most characters of JSON in one tool result. */
 export const RESPONSE_CAP_CHARS = 20_000;
 /** The most characters in one tool result's text rendering; the structured result carries the rest. */

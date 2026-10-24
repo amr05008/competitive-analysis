@@ -28,7 +28,7 @@ function searchLink(q: string, from: number, to: number): string {
 export async function hackerNewsMentions(
   input: HnInput,
   deps: ToolDeps,
-  opts: { maxFetches?: number; deadlineMs?: number } = {},
+  opts: { maxFetches?: number; deadlineMs?: number; hardDeadlineMs?: number } = {},
 ): Promise<HnResult> {
   const maxFetches = opts.maxFetches ?? HN_MAX_FETCHES;
   const deadlineMs = opts.deadlineMs ?? HN_DEADLINE_MS;
@@ -43,8 +43,12 @@ export async function hackerNewsMentions(
   const query = input.query.replace(/"/g, " ").replace(/\s+/g, " ").trim();
   if (query.length < 2) return errorResult("bad_input", "the name needs at least 2 characters besides quotes", [], deps.now());
 
-  // Each search needs room for itself and the year's cache write.
-  const budget = new Budget(maxFetches, deadlineMs, deps.now, { subrequests: deps.subrequests, reserve: 2 });
+  // Each search needs room for itself and the year's cache write. At the hard deadline, a search still running is cut.
+  const budget = new Budget(maxFetches, deadlineMs, deps.now, {
+    subrequests: deps.subrequests,
+    reserve: 2,
+    hardMs: opts.hardDeadlineMs,
+  });
   const tried: string[] = [];
   /** Requests the gate, or the subrequest counter below it, declined to make. */
   let refusals = 0;
@@ -54,7 +58,7 @@ export async function hackerNewsMentions(
       return new Response(null, { status: REFUSED_STATUS });
     }
     tried.push(String(url));
-    const res = await deps.fetch(url, init);
+    const res = await deps.fetch(url, { ...init, signal: budget.signal(init?.signal) });
     if (res.status === REFUSED_STATUS) refusals++;
     return res;
   }) as Fetcher;
@@ -66,7 +70,7 @@ export async function hackerNewsMentions(
       case "fetches":
         return `fetch budget of ${maxFetches} requests used up, so ${what}; ${again}`;
       case "time":
-        return `time limit of ${Math.round(deadlineMs / 1000)} s reached, so ${what}; ${again}`;
+        return `time limit of ${Math.round(budget.timeLimitMs / 1000)} s reached, so ${what}; ${again}`;
     }
   };
   const failText = (f: FailedOutcome) => `${f.reason}: ${clip(f.detail, MAX_DETAIL_CHARS)}`;
@@ -76,7 +80,7 @@ export async function hackerNewsMentions(
   const count = input.years ?? DEFAULT_YEARS;
   const notes: string[] = [];
 
-  // A year's searches stop the counts at the first one the budget refused (limit) or that failed.
+  // A year's searches stop the counts at the first one the budget refused or the hard deadline cut (limit), or that failed.
   type Stop = { kind: "limit" } | { kind: "failed"; failure: FailedOutcome };
   let stop: Stop | null = null;
   const years: Year[] = [];
@@ -89,7 +93,7 @@ export async function hackerNewsMentions(
     const to = yearStart(y + 1);
     const before = refusals;
     const r = await searchYear(gate, deps.cache, { query, site, fromTs: from, toTs: to, sampleTitles: SAMPLE_TITLES });
-    const refused = refusals > before;
+    const refused = refusals > before || budget.cut;
     if (!r.ok) {
       stop = refused ? { kind: "limit" } : { kind: "failed", failure: r };
       break;
@@ -142,7 +146,7 @@ export async function hackerNewsMentions(
           hn_link: `https://news.ycombinator.com/item?id=${h.id}`,
           story_link: h.url,
         }));
-      } else if (refusals > before) notes.push(stopNote("the top threads were not checked"));
+      } else if (refusals > before || budget.cut) notes.push(stopNote("the top threads were not checked"));
       else notes.push(`the top threads could not be fetched (${failText(r)})`);
     }
   } else notes.push("the top threads were not checked");

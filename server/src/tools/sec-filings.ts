@@ -29,7 +29,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 export async function secFilings(
   input: SecInput,
   deps: ToolDeps,
-  opts: { sleep?: (ms: number) => Promise<void>; maxFetches?: number; deadlineMs?: number } = {},
+  opts: { sleep?: (ms: number) => Promise<void>; maxFetches?: number; deadlineMs?: number; hardDeadlineMs?: number } = {},
 ): Promise<SecResult> {
   const maxFetches = opts.maxFetches ?? SEC_MAX_FETCHES;
   const deadlineMs = opts.deadlineMs ?? SEC_DEADLINE_MS;
@@ -53,8 +53,12 @@ export async function secFilings(
   if (label && label.length >= 2 && label.replace(/[^a-z0-9]/g, "") !== normalizeEntityName(name).replace(/ /g, "")) namesTried.push(label);
   const wanted = new Set(namesTried.map(normalizeEntityName));
 
-  // Each request needs room for itself and its cache write.
-  const budget = new Budget(maxFetches, deadlineMs, deps.now, { subrequests: deps.subrequests, reserve: 2 });
+  // Each request needs room for itself and its cache write. At the hard deadline, a request still running is cut.
+  const budget = new Budget(maxFetches, deadlineMs, deps.now, {
+    subrequests: deps.subrequests,
+    reserve: 2,
+    hardMs: opts.hardDeadlineMs,
+  });
   const tried: string[] = [];
   let lastStart: number | null = null;
   let rateLimited = false;
@@ -69,7 +73,7 @@ export async function secFilings(
     }
     lastStart = deps.now();
     tried.push(String(url));
-    const res = await deps.fetch(url, init);
+    const res = await deps.fetch(url, { ...init, signal: budget.signal(init?.signal) });
     if (res.status === 429) rateLimited = true; // after any 429 no further EDGAR request is made in this call
     return res;
   }) as Fetcher;
@@ -82,7 +86,7 @@ export async function secFilings(
       case "fetches":
         return `fetch budget of ${maxFetches} requests used up`;
       case "time":
-        return `time limit of ${Math.round(deadlineMs / 1000)} s reached`;
+        return `time limit of ${Math.round(budget.timeLimitMs / 1000)} s reached`;
     }
   };
   const advice = () =>
@@ -106,7 +110,7 @@ export async function secFilings(
     }
     const r = await searchEntities(gate, deps.cache, n);
     if (!r.ok) {
-      if (r.status !== REFUSED_STATUS) {
+      if (r.status !== REFUSED_STATUS && !budget.cut) {
         firstSearchFailure ??= r;
         partial = true;
         notes.push(`the search for "${n}" failed (${failText(r)})`);
@@ -147,7 +151,7 @@ export async function secFilings(
     }
     const r = await getSubmissions(gate, deps.cache, candidates[i].cik);
     if (!r.ok) {
-      if (r.status === REFUSED_STATUS) {
+      if (r.status === REFUSED_STATUS || budget.cut) {
         stopped = true;
         unchecked = candidates.length - i;
         break;
@@ -200,7 +204,7 @@ export async function secFilings(
       }
       const r = await getFormD(gate, deps.cache, sub.cik, f.accession);
       if (!r.ok) {
-        if (r.status === REFUSED_STATUS) skipped++;
+        if (r.status === REFUSED_STATUS || budget.cut) skipped++;
         else {
           formDFailed++;
           formDFailure ??= r;

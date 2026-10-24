@@ -1,5 +1,5 @@
 import { ARCHIVE_COOLDOWN_MS, ARCHIVE_GAP_MS, ARCHIVE_MAX_QUEUE } from "../config";
-import { politeFetch, type ArchiveFetch, type FailedOutcome, type FetchOutcome, type Fetcher } from "./http";
+import { politeFetch, REFUSED_STATUS, type ArchiveFetch, type FailedOutcome, type FetchOutcome, type Fetcher } from "./http";
 
 /**
  * A refusal: a 429, a 503, or a connection that was refused or dropped
@@ -14,8 +14,9 @@ function isRefusal(out: FailedOutcome): boolean {
  * Every Wayback Machine request on the server goes through one gate: one
  * request at a time, starts at least ARCHIVE_GAP_MS apart, at most
  * ARCHIVE_MAX_QUEUE pending (the running one included), and after a refusal
- * every request fails fast for ARCHIVE_COOLDOWN_MS. The state is in memory and
- * resets if the object is evicted.
+ * every request fails fast for ARCHIVE_COOLDOWN_MS. A request with `startBy` is
+ * turned away, unstarted, when its turn would begin after that moment. The state
+ * is in memory and resets if the object is evicted.
  */
 export class ArchiveGate {
   readonly #fetcher: Fetcher;
@@ -34,17 +35,20 @@ export class ArchiveGate {
 
   run: ArchiveFetch = (url, opts) => {
     if (this.#coolingDown()) return Promise.resolve(this.#paused(url));
+    if (this.#late(opts?.startBy, 0)) return Promise.resolve(this.#tooLate(url));
     if (this.#queued >= ARCHIVE_MAX_QUEUE) {
       return Promise.resolve<FetchOutcome>({ ok: false, reason: "server_busy", url, detail: "archive queue full" });
     }
     this.#queued++;
     const turn = this.#chain.then(async (): Promise<FetchOutcome> => {
-      const wait = this.#lastStart + ARCHIVE_GAP_MS - this.#now();
+      const wait = Math.max(0, this.#lastStart + ARCHIVE_GAP_MS - this.#now());
+      // The requests ahead of this one may have taken it past its start time.
+      if (this.#late(opts?.startBy, wait)) return this.#tooLate(url);
       if (wait > 0) await this.#sleep(wait);
       // A request ahead of this one may have been refused while it waited.
       if (this.#coolingDown()) return this.#paused(url);
       this.#lastStart = this.#now();
-      const out = await politeFetch(this.#fetcher, url, opts);
+      const out = await politeFetch(this.#fetcher, url, { timeoutMs: opts?.timeoutMs, maxBytes: opts?.maxBytes });
       if (!out.ok && isRefusal(out)) {
         this.#cooldownUntil = this.#now() + ARCHIVE_COOLDOWN_MS;
         return { ...out, reason: "source_rate_limited" };
@@ -60,6 +64,15 @@ export class ArchiveGate {
 
   #coolingDown(): boolean {
     return this.#now() < this.#cooldownUntil;
+  }
+
+  /** Whether a request that may start until `startBy` would start too late after `wait` more ms. */
+  #late(startBy: number | undefined, wait: number): boolean {
+    return startBy !== undefined && this.#now() + wait > startBy;
+  }
+
+  #tooLate(url: string): FetchOutcome {
+    return { ok: false, reason: "server_busy", status: REFUSED_STATUS, url, detail: "the archive queue would start this request too late" };
   }
 
   #paused(url: string): FetchOutcome {

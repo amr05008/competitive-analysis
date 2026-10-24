@@ -48,7 +48,7 @@ const newestFirst = (roles: RawRole[]): RawRole[] =>
 export async function jobOpenings(
   input: JobOpeningsInput,
   deps: ToolDeps,
-  opts: { maxFetches?: number; deadlineMs?: number } = {},
+  opts: { maxFetches?: number; deadlineMs?: number; hardDeadlineMs?: number } = {},
 ): Promise<JobOpeningsResult> {
   const maxFetches = opts.maxFetches ?? JOBS_MAX_FETCHES;
   const deadlineMs = opts.deadlineMs ?? JOBS_DEADLINE_MS;
@@ -59,15 +59,20 @@ export async function jobOpenings(
   const wanted = [...new Set((input.role_ids ?? []).map((id) => id.trim()).filter(Boolean))];
   const roleIds = wanted.slice(0, MAX_ROLE_IDS);
 
-  // The deadline counts from here. Every request goes through the gate, with room for itself and a cache write.
-  const budget = new Budget(maxFetches, deadlineMs, deps.now, { subrequests: deps.subrequests, reserve: 2 });
+  // The deadline counts from here. Every request goes through the gate, with room for itself and a cache
+  // write; at the hard deadline, a request still running is cut.
+  const budget = new Budget(maxFetches, deadlineMs, deps.now, {
+    subrequests: deps.subrequests,
+    reserve: 2,
+    hardMs: opts.hardDeadlineMs,
+  });
   /** Every address checked, in order: each request the gate let through, and each board answered from the cache. */
   const tried: string[] = [];
   const refusedUrls = new Set<string>();
   const gate: Fetcher = (async (url: RequestInfo | URL, init?: RequestInit) => {
     if (budget.take()) {
       tried.push(String(url));
-      const res = await deps.fetch(url, init);
+      const res = await deps.fetch(url, { ...init, signal: budget.signal(init?.signal) });
       // The subrequest counter below the gate declined it.
       if (res.status === REFUSED_STATUS) refusedUrls.add(String(url));
       return res;
@@ -84,7 +89,7 @@ export async function jobOpenings(
       case "fetches":
         return `fetch budget of ${maxFetches} requests used up, ${rest}`;
       case "time":
-        return `time limit of ${Math.round(deadlineMs / 1000)} s reached, ${rest}`;
+        return `time limit of ${Math.round(budget.timeLimitMs / 1000)} s reached, ${rest}`;
     }
   };
 
@@ -113,7 +118,7 @@ export async function jobOpenings(
     attempted.add(`${ats}:${slug}`);
     const refusals = refusedUrls.size;
     const r = await fetchBoard(gate, deps.cache, ats, slug);
-    const cut = refusedUrls.size > refusals;
+    const cut = refusedUrls.size > refusals || budget.cut;
     if (r.kind === "error" && cut) return false;
     const url = r.kind === "found" ? r.apiUrl : r.url;
     if (!tried.includes(url)) tried.push(url); // a board answered from the cache
@@ -148,14 +153,14 @@ export async function jobOpenings(
     else {
       const refusals = refusedUrls.size;
       const link = await findBoardLink(gate, site.domain);
-      const isRefusal = (f: { status?: number }) => f.status === REFUSED_STATUS && refusedUrls.size > refusals;
+      const isRefusal = (f: { status?: number }) => (f.status === REFUSED_STATUS && refusedUrls.size > refusals) || budget.cut;
       const careersFailures = link.failures.filter((f) => !isRefusal(f));
       for (const f of careersFailures) {
         failures.push(`careers page ${f.url} could not be checked (${failureText(f.reason, f.detail)})`);
         errors.push({ reason: f.reason });
       }
       absent += link.tried.length - link.failures.length;
-      if (refusedUrls.size > refusals) stopped = true;
+      if (refusedUrls.size > refusals || budget.cut) stopped = true;
       if (link.found && !attempted.has(`${link.found.ats}:${link.found.slug}`)) {
         if (!(await tryBoard(link.found.ats, link.found.slug))) stopped = true;
       }
@@ -215,7 +220,7 @@ export async function jobOpenings(
       const d = await fetchRoleDetail(gate, found.ats, found.slug, r.id, r);
       if (d.ok) detailed.push(toRole(r, { description: d.description, pay: d.pay ?? r.pay }));
       else {
-        if (refusedUrls.size > refusals) noteStop();
+        if (refusedUrls.size > refusals || budget.cut) noteStop();
         else notes.push(`role ${clip(r.id, MAX_ECHO_CHARS)}: the description could not be fetched (${failureText(d.reason, d.detail)})`);
         partial = true;
         detailed.push(toRole(r));

@@ -2,7 +2,7 @@ import { PAGE_HISTORY_DEADLINE_MS, PAGE_HISTORY_MAX_FETCHES, RESPONSE_CAP_CHARS,
 import { errorResult, utcDay } from "../contract/envelope";
 import type { PageHistoryInput, PageHistoryResult } from "../contract/tools";
 import { Budget } from "../shared/budget";
-import { REFUSED_STATUS, type ArchiveFetch, type FailedOutcome } from "../shared/http";
+import { REFUSED_STATUS, type ArchiveFetch, type FailedOutcome, type FetchOutcome } from "../shared/http";
 import { normalizePageUrl } from "../shared/inputs";
 import { limitReached } from "../shared/subrequests";
 import { copyKey, type Fingerprint } from "../sources/fingerprint";
@@ -132,8 +132,8 @@ function middle(reads: (Read | undefined)[], i: number, j: number): number | nul
  * middles), then bisects between readable samples in date order whose copy
  * differs, earliest bracket first, until each change sits between
  * two captures with no readable one between them. Stops for good at the first
- * capture fetch the budget or deadline refuses, or the first archive failure;
- * nothing is retried. Cached fingerprints cost no budget.
+ * capture fetch the budget or deadline refuses or the hard deadline cuts, or the
+ * first archive failure; nothing is retried. Cached fingerprints cost no budget.
  */
 async function findChanges(
   captures: CaptureRow[],
@@ -165,7 +165,9 @@ async function findChanges(
       return true;
     }
     if (!r.ok) {
-      state.stop ??= { kind: "refused", failure: r };
+      // A request this server declined (its own budget, or a queue turn past the start time) or the
+      // hard deadline cut is a time stop, not the archive refusing.
+      state.stop ??= r.status === REFUSED_STATUS || budget.cut ? { kind: "deadline" } : { kind: "refused", failure: r };
       return false;
     }
     reads[i] = r.fp.readable ? { fp: r.fp, key: copyKey(r.fp) } : "unreadable";
@@ -272,7 +274,7 @@ const shownKey = (fp: Fingerprint) => copyKey({ ...fp, description: "" });
 export async function pageHistory(
   input: PageHistoryInput,
   deps: ToolDeps,
-  opts: { maxFetches?: number; deadlineMs?: number; sampleSize?: number } = {},
+  opts: { maxFetches?: number; deadlineMs?: number; sampleSize?: number; hardDeadlineMs?: number } = {},
 ): Promise<PageHistoryResult> {
   const maxFetches = opts.maxFetches ?? PAGE_HISTORY_MAX_FETCHES;
   const deadlineMs = opts.deadlineMs ?? PAGE_HISTORY_DEADLINE_MS;
@@ -289,15 +291,35 @@ export async function pageHistory(
 
   // The deadline counts from here. The budget gates capture fetches only. Archive requests aren't
   // subrequests of this call, but each capture read needs room for its cache write.
-  const budget = new Budget(maxFetches, deadlineMs, deps.now, { subrequests: deps.subrequests, reserve: 1 });
+  const budget = new Budget(maxFetches, deadlineMs, deps.now, {
+    subrequests: deps.subrequests,
+    reserve: 1,
+    hardMs: opts.hardDeadlineMs,
+  });
   let requests = 0;
+  // Every archive request asks the gate to start it by the deadline. The Limits object can't take a
+  // signal, so at the hard deadline the call stops waiting for a request still running.
   const archive: ArchiveFetch = (url, o) => {
     requests++;
-    return deps.archive(url, o);
+    return budget.race(
+      () => deps.archive(url, { ...o, startBy: budget.startBy }),
+      (): FetchOutcome => ({ ok: false, reason: "server_busy", status: REFUSED_STATUS, url, detail: "cut at the call's time limit" }),
+    );
   };
+  // The two index queries aren't budgeted, but they don't start after the deadline either.
+  const indexQuery: ArchiveFetch = (url, o) =>
+    budget.timeUp
+      ? Promise.resolve({
+          ok: false,
+          reason: "server_busy",
+          status: REFUSED_STATUS,
+          url,
+          detail: `time limit of ${Math.round(budget.timeLimitMs / 1000)} s reached before this index query`,
+        })
+      : archive(url, o);
   const notes: string[] = [];
 
-  const earliest = await earliestCapture(archive, deps.cache, page.cdxKey);
+  const earliest = await earliestCapture(indexQuery, deps.cache, page.cdxKey);
   let firstCapture: CaptureFields | null = null;
   if (!earliest.ok) {
     notes.push(`archive refused the earliest-capture lookup (${failureText(earliest)}), so first_capture is missing`);
@@ -306,7 +328,7 @@ export async function pageHistory(
   }
 
   const listed = await listCaptures(
-    archive,
+    indexQuery,
     deps.cache,
     page.cdxKey,
     range.from.replace("-", ""),
@@ -325,7 +347,7 @@ export async function pageHistory(
   const search = await findChanges(captures, page.url, deps.cache, archive, budget, sampleSize);
   const fpAt = (i: number) => (search.reads[i] as { fp: Fingerprint }).fp;
 
-  if (search.stop) notes.push(stopNote(search.stop, maxFetches, deadlineMs, deps.subrequests.limit));
+  if (search.stop) notes.push(stopNote(search.stop, maxFetches, budget.timeLimitMs, deps.subrequests.limit));
   if (search.samplesRead < search.samplesTotal) {
     notes.push(
       search.samplesRead === 0

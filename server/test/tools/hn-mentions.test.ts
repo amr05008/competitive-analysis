@@ -5,7 +5,7 @@ import { hnOutput, type HnInput, type HnResult } from "../../src/contract/tools"
 import { callDeps, render, type ToolDeps } from "../../src/tools";
 import { hackerNewsMentions, renderHn } from "../../src/tools/hn-mentions";
 import { Subrequests } from "../../src/shared/subrequests";
-import { fakeFetch, type FakeFetch, type Route } from "../helpers/fake-fetch";
+import { fakeFetch, hangingOn, type FakeFetch, type Route } from "../helpers/fake-fetch";
 import { meter } from "../helpers/meter";
 import fixture from "../fixtures/hn/search-hightouch.json";
 
@@ -159,6 +159,16 @@ describe("hacker_news_mentions", () => {
     const result = await hackerNewsMentions({ query: "Hightouch" }, slow);
     expect(result.status).toBe("partial");
     expect(result.notes.join(" ")).toContain("time limit of 25 s reached");
+  });
+
+  it("cuts a search still running at the hard deadline and returns the years done as partial", async () => {
+    const fetch = hangingOn(fakeFetch(yearRoutes("Hightouch", ALL)), storiesUrl("Hightouch", 2023));
+    const result = await hackerNewsMentions({ query: "Hightouch" }, await deps(fetch), { hardDeadlineMs: 50 });
+    expect(schema.safeParse(result).error).toBeUndefined();
+    expect(result.status).toBe("partial");
+    expect(result.years?.map((y) => y.year)).toEqual([2021, 2022]);
+    expect(result.notes.join(" ")).toMatch(/time limit of \d+ s reached, so the counts stop here/);
+    expect(result.notes.join(" ")).not.toMatch(/connection failed|request failed/);
   });
 
   it("refuses a bad domain before any fetch", async () => {
