@@ -45,8 +45,8 @@ const schema = z.object(pageHistoryOutput);
 
 /**
  * Runs the tool and checks the result against the published output schema. The search tests are written
- * for eight samples of twenty captures (0, 3, 5, 8, 11, 14, 16, 19), so the sample size is eight here;
- * the default has its own test.
+ * for eight samples of twenty captures (0, 3, 5, 8, 11, 14, 16, 19, read in the order 0, 19, 8, 3, 14, 5,
+ * 11, 16), so the sample size is eight here; the default has its own tests.
  */
 async function call(
   input: PageHistoryInput,
@@ -55,6 +55,13 @@ async function call(
 ): Promise<PageHistoryResult> {
   const { maxFetches, deadlineMs, ...rest } = opts;
   const result = await pageHistory(input, await depsFor(archive, rest), { maxFetches, deadlineMs, sampleSize: 8 });
+  expect(schema.safeParse(result).error).toBeUndefined();
+  return result;
+}
+
+/** Runs the tool with the production sample size, checked against the output schema like call(). */
+async function callDefault(input: PageHistoryInput, archive: ArchiveFetch): Promise<PageHistoryResult> {
+  const result = await pageHistory(input, await depsFor(archive));
   expect(schema.safeParse(result).error).toBeUndefined();
   return result;
 }
@@ -123,9 +130,49 @@ describe("page_history: dating changes", () => {
     // On a six-year homepage history, eight samples sat nine months apart and hid whole positioning
     // eras inside one bracket; earliest-first bisection never reached the later ones in two calls.
     const fake = fakeArchive(copies(() => "Alpha", 31));
-    const r = await pageHistory(JAN, await depsFor(fake));
+    const r = await callDefault(JAN, fake);
     expect(r.status).toBe("ok");
     expect(r.fetches_used).toBe(2 + 16);
+  });
+
+  it("bisects between sixteen samples, earliest bracket first", async () => {
+    // Thirty-one captures sample every other one (0, 2, …, 30). Copy changes at 7 and at 23, so
+    // brackets (6,8) and (22,24) each take one more capture to pin.
+    const fake = fakeArchive(copies((i) => (i < 7 ? "Alpha" : i < 23 ? "Bravo" : "Charlie"), 31));
+    const r = await callDefault(JAN, fake);
+    expect(r.status).toBe("ok");
+    expect(r.changes!.map((c) => [c.before.timestamp, c.after.timestamp, c.resolved])).toEqual([
+      [ts(6), ts(7), true],
+      [ts(22), ts(23), true],
+    ]);
+    expect(r.fetches_used).toBe(2 + 16 + 2);
+    // Both bisection reads come after every sample, the earlier bracket's first.
+    expect(fake.calls.slice(-2)).toEqual([expect.stringContaining(`/web/${ts(7)}id_/`), expect.stringContaining(`/web/${ts(23)}id_/`)]);
+  });
+
+  it.each([
+    ["the fetch budget", { maxFetches: 2 }, 2, [[0, 19]]],
+    ["the deadline", { deadline: true }, 3, [[8, 19]]],
+  ] as const)("a stop at %s during sampling still covers the last capture", async (_, how, read, expected) => {
+    // Copy changes at 17, between the last two samples (16 and 19). Samples are read both ends
+    // first, then middles (0, 19, 8, 3, …), so a stop leaves wide brackets across the whole range
+    // rather than an unchecked tail.
+    let t = NOW;
+    const fake = fakeArchive(copies((i) => (i < 17 ? "Alpha" : "Bravo")));
+    // For the deadline, every request takes five seconds: captures start at 10, 15 and 20 s, not 25.
+    const slow: ArchiveFetch = async (url, opts) => {
+      t += 5_000;
+      return fake(url, opts);
+    };
+    const r =
+      "deadline" in how ? await call(JAN, slow, { now: () => t }) : await call(JAN, fake, { maxFetches: how.maxFetches });
+    expect(r.status).toBe("partial");
+    expect(pairs(r)).toEqual(expected.map(([i, j]) => [ts(i), ts(j)]));
+    expect(r.changes!.every((c) => !c.resolved)).toBe(true);
+    expect(r.notes).toContain(
+      `${8 - read} of 8 samples weren't read, so the brackets are wider than usual and may each hide more than one change`,
+    );
+    expect(r.notes.some((n) => n.includes("weren't checked"))).toBe(false);
   });
 
   it("works on the earliest bracket first", async () => {
@@ -169,7 +216,8 @@ describe("page_history: budget, deadline and failures", () => {
     expect(r.status).toBe("partial");
     expect(r.changes).toHaveLength(1);
     expect(r.changes![0]).toMatchObject({ resolved: false });
-    expect(pairs(r)).toEqual([[ts(3), ts(5)]]);
+    // Samples are read both ends first, then middles: 0, 19, 8, 3. The change sits between 3 and 8.
+    expect(pairs(r)).toEqual([[ts(3), ts(8)]]);
     expect(r.notes.some((n) => n.includes("still wide"))).toBe(true);
     expect(r.notes.some((n) => n.includes("archive refused"))).toBe(false);
     // The two index queries aren't budgeted; four captures are.
@@ -188,19 +236,24 @@ describe("page_history: budget, deadline and failures", () => {
     ).toBe(true);
     expect(fake.calls).toHaveLength(5);
     expect(r.fetches_used).toBe(5);
-    // Samples 0 and 3 were read before the refusal; their change stays wide.
-    expect(pairs(r)).toEqual([[ts(0), ts(3)]]);
+    // Samples 0 and 19 (both ends first) were read before the refusal; their change stays wide.
+    expect(pairs(r)).toEqual([[ts(0), ts(19)]]);
     expect(r.changes![0].resolved).toBe(false);
     expect(r.first_capture?.timestamp).toBe(EARLIEST.timestamp);
   });
 
   it("after a stop, a bracket with nothing unread inside is still resolved", async () => {
-    // Six captures, all sampled; the fifth capture fetch (call 7) fails after A,A,B,B are read.
+    // Six captures, all sampled, read 0, 5, 2, 1, 3, 4; the fifth capture fetch (call 7, capture 3)
+    // fails after A (0), C (5), B (2) and A (1) are read. (1,2) has nothing unread inside, so it is
+    // resolved; (2,5) still has 3 and 4 unread, so it stays wide.
     const fake = fakeArchive({ ...copies((i) => ["Alpha", "Alpha", "Bravo", "Bravo", "Charlie", "Charlie"][i], 6), failAt: 7 });
     const r = await call(JAN, fake);
     expect(r.status).toBe("partial");
-    expect(r.changes!.map((c) => [c.before.timestamp, c.after.timestamp, c.resolved])).toEqual([[ts(1), ts(2), true]]);
-    expect(r.notes.some((n) => n.includes("still wide"))).toBe(false);
+    expect(r.changes!.map((c) => [c.before.timestamp, c.after.timestamp, c.resolved])).toEqual([
+      [ts(1), ts(2), true],
+      [ts(2), ts(5), false],
+    ]);
+    expect(r.notes.some((n) => n.includes("still wide") && n.includes(`${dateOf(2)} to ${dateOf(5)}`))).toBe(true);
     expect(fake.calls).toHaveLength(7);
   });
 
@@ -228,8 +281,10 @@ describe("page_history: budget, deadline and failures", () => {
     expect(note).toContain("source_unavailable");
     expect(note).toContain("narrower range");
     expect(note).not.toContain("wait a few minutes");
-    // Two index queries, samples 0 and 3, then the failed sample 5, never retried.
-    expect(fake.calls).toHaveLength(5);
+    // Two index queries, samples 0, 19, 8, 3 and 14 (both ends, then middles), then the failed
+    // sample 5, never retried.
+    expect(fake.calls).toHaveLength(8);
+    expect(fake.calls.filter((u) => u.includes(`/web/${ts(5)}id_/`))).toHaveLength(1);
   });
 
   it("an index answer at its row limit is partial", async () => {
@@ -266,6 +321,7 @@ describe("page_history: budget, deadline and failures", () => {
       return fake(url, opts);
     };
     const r = await call(JAN, slow, { now: () => t });
+    expect(r.status).toBe("partial");
     expect(r.notes.some((n) => n.includes("time limit of 22 s"))).toBe(true);
     // Two index queries and the captures started at 12 and 18 s; the one at 24 s never starts.
     expect(fake.calls).toHaveLength(4);

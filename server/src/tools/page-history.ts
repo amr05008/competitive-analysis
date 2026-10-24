@@ -91,9 +91,28 @@ type Search = {
   reads: (Read | undefined)[];
   brackets: Bracket[];
   stop: Stop | null;
-  /** When sampling stopped early: the index of the last sample read, or -1 when none was. */
-  sampledThrough: number | null;
+  /** How many of the samples were fetched before any stop, out of how many there are. */
+  samplesRead: number;
+  samplesTotal: number;
 };
+
+/**
+ * Ranks 0…count−1 coarse to fine: both ends, then the middle of each gap, widest gaps first. Read in
+ * this order, samples cut short by a stop still span the whole range, with wider brackets.
+ */
+function coarseToFine(count: number): number[] {
+  if (count <= 1) return count === 1 ? [0] : [];
+  const order = [0, count - 1];
+  const gaps: [number, number][] = [[0, count - 1]];
+  for (let g = 0; g < gaps.length; g++) {
+    const [a, b] = gaps[g];
+    if (b - a < 2) continue;
+    const m = Math.floor((a + b) / 2);
+    order.push(m);
+    gaps.push([a, m], [m, b]);
+  }
+  return order;
+}
 
 /**
  * The index to read between i and j: the middle, or the nearest unread capture
@@ -108,8 +127,9 @@ function middle(reads: (Read | undefined)[], i: number, j: number): number | nul
 }
 
 /**
- * Samples `sampleSize` captures evenly, then bisects between readable samples
- * whose copy differs, earliest bracket first, until each change sits between
+ * Samples `sampleSize` captures evenly, read coarse to fine (both ends, then
+ * middles), then bisects between readable samples in date order whose copy
+ * differs, earliest bracket first, until each change sits between
  * two captures with no readable one between them. Stops for good at the first
  * capture fetch the budget or deadline refuses, or the first archive failure;
  * nothing is retried. Cached fingerprints cost no budget.
@@ -157,13 +177,19 @@ async function findChanges(
     n === 0
       ? []
       : [...new Set(Array.from({ length: sampleSize }, (_, k) => Math.round((k * (n - 1)) / (sampleSize - 1))))];
+  const order = coarseToFine(samples.length);
   let sampled = 0;
-  for (const i of samples) {
-    if (!(await read(i))) break;
+  for (const rank of order) {
+    if (!(await read(samples[rank]))) break;
     sampled++;
   }
 
-  const good = samples.slice(0, sampled).filter(isReadable);
+  // Brackets run between the readable samples in date order, however many were read.
+  const good = order
+    .slice(0, sampled)
+    .map((rank) => samples[rank])
+    .sort((a, b) => a - b)
+    .filter(isReadable);
   const pending: [number, number][] = [];
   for (let s = 1; s < good.length; s++) {
     if (keyAt(good[s - 1]) !== keyAt(good[s])) pending.push([good[s - 1], good[s]]);
@@ -192,7 +218,8 @@ async function findChanges(
     reads,
     brackets: [...done, ...pending.map(([i, j]) => ({ i, j, resolved: middle(reads, i, j) === null }))],
     stop: state.stop,
-    sampledThrough: sampled < samples.length ? (sampled ? samples[sampled - 1] : -1) : null,
+    samplesRead: sampled,
+    samplesTotal: samples.length,
   };
 }
 
@@ -295,11 +322,11 @@ export async function pageHistory(
   const fpAt = (i: number) => (search.reads[i] as { fp: Fingerprint }).fp;
 
   if (search.stop) notes.push(stopNote(search.stop, maxFetches, deadlineMs));
-  if (search.sampledThrough !== null) {
+  if (search.samplesRead < search.samplesTotal) {
     notes.push(
-      search.sampledThrough < 0
+      search.samplesRead === 0
         ? "no capture in range was checked"
-        : `captures after ${dateOf(captures[search.sampledThrough].timestamp)} weren't checked, so later changes may be missing`,
+        : `${search.samplesTotal - search.samplesRead} of ${search.samplesTotal} samples weren't read, so the brackets are wider than usual and may each hide more than one change`,
     );
   }
   const unreadable = search.reads.filter((r) => r === "unreadable").length;
