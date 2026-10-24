@@ -53,13 +53,14 @@ describe("MCP endpoint", () => {
     expect(result.serverInfo.version).toBe("0.2.0");
   });
 
-  // One call per test, under the test cap of 3 calls a day.
+  // One call per test, under the test cap of 3 calls a day. A built tool gets
+  // input it refuses as bad_input before any fetch: tests never reach live sources.
   it.each([
-    ["page_history", { url: "https://example.com/pricing" }],
+    ["page_history", { url: "http://127.0.0.1/" }],
     ["job_openings", { domain: "example.com" }],
     ["hacker_news_mentions", { query: "Example" }],
     ["sec_filings", { company_name: "Example" }],
-  ])("calling %s with valid input returns the stub error", async (name, args) => {
+  ])("calling %s returns an error envelope with the fallback line", async (name, args) => {
     const result = await rpc("tools/call", { name, arguments: args });
     expect(result.isError).toBe(true);
     expect(result.structuredContent.status).toBe("error");

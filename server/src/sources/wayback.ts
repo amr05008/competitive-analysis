@@ -6,6 +6,8 @@ import { extractFingerprint, type Fingerprint } from "./fingerprint";
 export type CaptureRow = { timestamp: string; digest: string };
 
 const CDX = "https://web.archive.org/cdx/search/cdx";
+/** The most rows listCaptures asks the index for. */
+export const CDX_LIMIT = 2000;
 
 /** Rows of a CDX `output=json` answer, minus the header row; null when the body isn't that shape. */
 function parseRows(text: string): CaptureRow[] | null {
@@ -59,7 +61,7 @@ export async function listCaptures(
 ): Promise<{ ok: true; captures: CaptureRow[] } | FailedOutcome> {
   const url =
     `${CDX}?url=${encodeURIComponent(cdxKey)}&output=json&from=${from}&to=${to}` +
-    `&collapse=digest&filter=statuscode:200&filter=mimetype:text/html&fl=timestamp,digest&limit=2000`;
+    `&collapse=digest&filter=statuscode:200&filter=mimetype:text/html&fl=timestamp,digest&limit=${CDX_LIMIT}`;
   const r = await cdxRows(archive, cache, url);
   return r.ok ? { ok: true, captures: r.rows } : r;
 }

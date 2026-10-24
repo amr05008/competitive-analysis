@@ -21,3 +21,12 @@ export const TTL_CDX = 86_400;
 export const TTL_FINGERPRINT = 31_536_000;
 /** The most bytes read from one archived capture. */
 export const CAPTURE_MAX_BYTES = 1_500_000;
+
+/** How many captures page_history reads first, spread evenly across the range. */
+export const SAMPLE_SIZE = 8;
+/** The most captures page_history fetches in one call; its two index queries aren't counted. */
+export const PAGE_HISTORY_MAX_FETCHES = 30;
+/** How long page_history may keep starting capture fetches, counted from the start of the call. */
+export const PAGE_HISTORY_DEADLINE_MS = 25_000;
+/** The most characters of JSON in one tool result. */
+export const RESPONSE_CAP_CHARS = 20_000;
