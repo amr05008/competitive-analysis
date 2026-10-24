@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { errorResult } from "../src/contract/envelope";
 import type { ToolName, ToolResult } from "../src/contract/tools";
 import type { runTool } from "../src/mcp";
-import { SELF_CHECKS, runScheduled, runSelfCheck, weeklySummary } from "../src/selfcheck";
+import { SCHEDULE, SELF_CHECKS, runScheduled, runSelfCheck, weeklySummary } from "../src/selfcheck";
 import { postDiscord } from "../src/discord";
 
 const NOW = Date.parse("2026-10-24T06:00:00Z"); // a Saturday
@@ -74,7 +74,7 @@ function fakeFetcher(status = 204) {
 }
 
 const HOOK = "https://discord.test/api/webhooks/fake";
-const withEnv = (extra: Record<string, string | undefined>) => ({ ...env, ...extra }) as unknown as Env;
+const withEnv = (extra: Record<string, unknown>) => ({ ...env, ...extra }) as unknown as Env;
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -105,27 +105,47 @@ describe("SELF_CHECKS", () => {
 });
 
 describe("scheduled self-check", () => {
-  it("posts nothing when every check passes", async () => {
-    const { run } = fakeRunner();
+  const CRONS: [string, ToolName][] = [
+    ["0 13 * * *", "page_history"],
+    ["5 13 * * *", "job_openings"],
+    ["10 13 * * *", "hacker_news_mentions"],
+    ["15 13 * * *", "sec_filings"],
+  ];
+  const prod = (extra: Record<string, unknown> = {}) => withEnv({ DISCORD_WEBHOOK_URL: HOOK, ENVIRONMENT: "production", ...extra });
+
+  it("the schedule is the four crons, one tool each", () => {
+    expect([...SCHEDULE]).toEqual(CRONS);
+  });
+
+  it.each(CRONS)("%s runs only %s, as a self-check call", async (cron, tool) => {
+    const { run, calls } = fakeRunner();
     const { fetcher, posts } = fakeFetcher();
-    await runScheduled(withEnv({ DISCORD_WEBHOOK_URL: HOOK, ENVIRONMENT: "production" }), createExecutionContext(), NOW, { run, fetcher });
+    await runScheduled(prod(), createExecutionContext(), cron, NOW, { run, fetcher });
+    expect(calls).toEqual([{ name: tool, input: SELF_CHECKS.find((c) => c.tool === tool)!.input(NOW), selfCheck: true }]);
     expect(posts).toEqual([]);
   });
 
-  it("posts one message naming each failing tool and its detail", async () => {
+  it.each(["0 6 * * *", "", "constructor", "__proto__", "0 13 * * 1"])("an unknown cron %j does nothing, even on a Monday", async (cron) => {
+    const { run, calls } = fakeRunner();
+    const { fetcher, posts } = fakeFetcher();
+    await runScheduled(prod(), createExecutionContext(), cron, MONDAY, { run, fetcher });
+    expect(calls).toEqual([]);
+    expect(posts).toEqual([]);
+  });
+
+  it("posts one message naming the failing tool and its detail", async () => {
     const { run } = fakeRunner({
       job_openings: { ...base, status: "ok" } as ToolResult,
       sec_filings: errorResult("source_unavailable", "EDGAR down", [], NOW),
     });
-    const { fetcher, posts } = fakeFetcher();
-    await runScheduled(withEnv({ DISCORD_WEBHOOK_URL: HOOK, ENVIRONMENT: "production" }), createExecutionContext(), NOW, { run, fetcher });
-    expect(posts).toHaveLength(1);
-    const text = posts[0]!.body.content;
-    expect(posts[0]!.url).toBe(HOOK);
-    expect(text.startsWith("competitive-analysis self-check (production) failed:")).toBe(true);
-    expect(text).toContain("job_openings: no board found");
-    expect(text).toContain("sec_filings: error source_unavailable");
-    expect(text).not.toContain("page_history");
+    const jobs = fakeFetcher();
+    await runScheduled(prod(), createExecutionContext(), "5 13 * * *", NOW, { run, fetcher: jobs.fetcher });
+    expect(jobs.posts).toHaveLength(1);
+    expect(jobs.posts[0]!.url).toBe(HOOK);
+    expect(jobs.posts[0]!.body.content).toBe("competitive-analysis self-check (production) failed:\n- job_openings: no board found");
+    const sec = fakeFetcher();
+    await runScheduled(prod(), createExecutionContext(), "15 13 * * *", NOW, { run, fetcher: sec.fetcher });
+    expect(sec.posts.map((p) => p.body.content)).toEqual(["competitive-analysis self-check (production) failed:\n- sec_filings: error source_unavailable"]);
   });
 
   it("self-check calls run with selfCheck true", async () => {
@@ -144,37 +164,51 @@ describe("scheduled self-check", () => {
     expect(JSON.stringify(failures)).not.toContain("boom");
   });
 
-  it("posts the weekly summary on Mondays (UTC) only", async () => {
+  it("posts the weekly summary on Mondays (UTC), with the 13:00 run only", async () => {
     const { run } = fakeRunner();
-    const e = withEnv({ DISCORD_WEBHOOK_URL: HOOK, ENVIRONMENT: "production" });
     const sat = fakeFetcher();
-    await runScheduled(e, createExecutionContext(), NOW, { run, fetcher: sat.fetcher });
+    await runScheduled(prod(), createExecutionContext(), "0 13 * * *", NOW, { run, fetcher: sat.fetcher });
     expect(sat.posts).toEqual([]);
     const mon = fakeFetcher();
-    await runScheduled(e, createExecutionContext(), MONDAY, { run, fetcher: mon.fetcher });
-    expect(mon.posts).toHaveLength(1);
-    expect(mon.posts[0]!.body.content).toBe("competitive-analysis usage, 2026-10-19 to 2026-10-25: no calls this week");
+    await runScheduled(prod(), createExecutionContext(), "0 13 * * *", MONDAY, { run, fetcher: mon.fetcher });
+    expect(mon.posts.map((p) => p.body.content)).toEqual(["competitive-analysis usage, 2026-10-19 to 2026-10-25: no calls this week"]);
+    for (const [cron] of CRONS.slice(1)) {
+      const later = fakeFetcher();
+      await runScheduled(prod(), createExecutionContext(), cron, MONDAY, { run, fetcher: later.fetcher });
+      expect(later.posts, cron).toEqual([]);
+    }
+  });
+
+  it("a failed Monday usage read posts a one-line notice", async () => {
+    const { run } = fakeRunner();
+    const LIMITS = { idFromName: () => ({}), get: () => ({ usage: () => Promise.reject(new Error("storage down")) }) } as unknown as Env["LIMITS"];
+    const { fetcher, posts } = fakeFetcher();
+    await runScheduled(prod({ LIMITS }), createExecutionContext(), "0 13 * * *", MONDAY, { run, fetcher });
+    expect(posts.map((p) => p.body.content)).toEqual(["competitive-analysis usage summary unavailable this week (2026-10-19 to 2026-10-25)"]);
   });
 
   it("a missing webhook logs one warning and doesn't throw", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { run } = fakeRunner({ job_openings: { ...base, status: "ok" } as ToolResult });
     const { fetcher, posts } = fakeFetcher();
-    await runScheduled(withEnv({ DISCORD_WEBHOOK_URL: undefined }), createExecutionContext(), NOW, { run, fetcher });
+    await runScheduled(withEnv({ DISCORD_WEBHOOK_URL: undefined }), createExecutionContext(), "5 13 * * *", NOW, { run, fetcher });
     expect(posts).toEqual([]);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0]!.join(" "))).not.toMatch(/https?:|hightouch/i);
   });
 
-  it("SELF_CHECK_FORCE_FAIL is honored only when ENVIRONMENT is dev", async () => {
+  it("SELF_CHECK_FORCE_FAIL is honored only when ENVIRONMENT is dev, and only for the cron's tool", async () => {
     const { run, calls } = fakeRunner();
     const dev = await runSelfCheck(run, withEnv({ ENVIRONMENT: "dev", SELF_CHECK_FORCE_FAIL: "1" }), createExecutionContext(), NOW);
     expect(dev).toHaveLength(4);
     expect(dev.every((f) => f.detail === "forced")).toBe(true);
     expect(calls).toEqual([]);
-    const prod = await runSelfCheck(run, withEnv({ ENVIRONMENT: "production", SELF_CHECK_FORCE_FAIL: "1" }), createExecutionContext(), NOW);
-    expect(prod).toEqual([]);
+    const prodRun = await runSelfCheck(run, withEnv({ ENVIRONMENT: "production", SELF_CHECK_FORCE_FAIL: "1" }), createExecutionContext(), NOW);
+    expect(prodRun).toEqual([]);
     expect(calls).toHaveLength(4);
+    const { fetcher, posts } = fakeFetcher();
+    await runScheduled(withEnv({ ENVIRONMENT: "dev", SELF_CHECK_FORCE_FAIL: "1", DISCORD_WEBHOOK_URL: HOOK }), createExecutionContext(), "10 13 * * *", NOW, { run, fetcher });
+    expect(posts.map((p) => p.body.content)).toEqual(["competitive-analysis self-check (dev) failed:\n- hacker_news_mentions: forced"]);
   });
 });
 
@@ -229,13 +263,16 @@ describe("postDiscord", () => {
 });
 
 describe("scheduled handler", () => {
-  it("is exported and does not throw without a webhook", async () => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("is exported, runs the cron's check, and does not throw without a webhook", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const worker = (await import("../src/index")).default;
     expect(typeof worker.scheduled).toBe("function");
+    // The forced failure keeps the real check off the network, and it is honored only in dev.
+    expect(env.ENVIRONMENT).toBe("dev");
     const ctx = createExecutionContext();
-    // The Limits object is real; ENVIRONMENT is dev with force-fail so no network is touched.
-    await worker.scheduled!({ scheduledTime: NOW, cron: "0 6 * * *", noRetry() {} } as ScheduledController, withEnv({ SELF_CHECK_FORCE_FAIL: "1", DISCORD_WEBHOOK_URL: undefined }), ctx);
+    await worker.scheduled!({ scheduledTime: NOW, cron: "0 13 * * *", noRetry() {} } as ScheduledController, withEnv({ SELF_CHECK_FORCE_FAIL: "1", DISCORD_WEBHOOK_URL: undefined }), ctx);
     await waitOnExecutionContext(ctx);
+    // The forced page_history failure tried to post, and with no webhook it warned instead.
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });

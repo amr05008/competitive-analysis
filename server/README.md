@@ -63,6 +63,10 @@ instead.
 - `SUBREQUEST_LIMIT` (45) caps each tool call's fetches plus Cache API calls. The free plan
   counts both against one limit of 50 per request, and a tool that reaches 45 returns what it
   has as partial, with a note to call again. On the paid plan, raise it to about 900.
+- The daily self-check runs one tool per Cron Trigger, at 13:00, 13:05, 13:10 and 13:15 UTC
+  (`SCHEDULE` in `src/selfcheck.ts`), so each invocation stays within its subrequest and CPU
+  limits. The Monday usage summary goes with 13:00. The crons belong to production only; any
+  other cron does nothing.
 - Cache keys start with the environment's name and a version per source, since staging and
   production share one zone's cache. Bump a source's version when its cached shape changes.
 - The compatibility date (2026-08-15) is the newest the test pool's bundled workerd supports,

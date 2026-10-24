@@ -63,19 +63,34 @@ export const SELF_CHECKS: SelfCheck[] = [
   },
 ];
 
-/** Runs every check once through `run` (as self-check calls). Returns the ones that failed. */
+/**
+ * The production cron triggers, one tool each: a tool call may make only so many subrequests, and a
+ * Cron Trigger gets little CPU on the free plan, so each check runs in its own invocation. The weekly
+ * summary goes with the first.
+ */
+export const SCHEDULE: ReadonlyMap<string, ToolName> = new Map([
+  ["0 13 * * *", "page_history"],
+  ["5 13 * * *", "job_openings"],
+  ["10 13 * * *", "hacker_news_mentions"],
+  ["15 13 * * *", "sec_filings"],
+]);
+const SUMMARY_CRON = "0 13 * * *";
+
+/** Runs the checks for `tools` (every tool unless given) once through `run`, as self-check calls. Returns the ones that failed. */
 export async function runSelfCheck(
   run: typeof runTool,
   env: Env,
   ctx: ExecutionContext,
   now: number,
+  tools: readonly ToolName[] = TOOL_NAMES,
 ): Promise<{ tool: ToolName; detail: string }[]> {
+  const checks = SELF_CHECKS.filter((c) => tools.includes(c.tool));
   // Honored only in dev, so a stray value in production can't fake an alarm.
   if (env.ENVIRONMENT === "dev" && env.SELF_CHECK_FORCE_FAIL) {
-    return SELF_CHECKS.map((c) => ({ tool: c.tool, detail: "forced" }));
+    return checks.map((c) => ({ tool: c.tool, detail: "forced" }));
   }
   const failures: { tool: ToolName; detail: string }[] = [];
-  for (const check of SELF_CHECKS) {
+  for (const check of checks) {
     let detail: string | null;
     try {
       detail = check.pass(await run(check.tool, check.input(now), env, ctx, { selfCheck: true }));
@@ -107,26 +122,33 @@ export function weeklySummary(rows: UsageRow[], fromDay: string, toDay: string):
   return head + parts.join("; ");
 }
 
-/** The daily job: run the checks, post any failures, and on Mondays (UTC) post last week's usage. */
+/**
+ * One daily cron invocation: run the check for the cron's tool (see SCHEDULE) and post a failure, and
+ * with the first cron on Mondays (UTC), post last week's usage. A cron not in SCHEDULE does nothing.
+ */
 export async function runScheduled(
   env: Env,
   ctx: ExecutionContext,
+  cron: string,
   now: number,
   deps: { run: typeof runTool; fetcher: typeof fetch },
 ): Promise<void> {
-  const failures = await runSelfCheck(deps.run, env, ctx, now);
+  const tool = SCHEDULE.get(cron);
+  if (tool === undefined) return;
+  const failures = await runSelfCheck(deps.run, env, ctx, now, [tool]);
   if (failures.length > 0) {
     const lines = failures.map((f) => `- ${f.tool}: ${f.detail}`);
     await postDiscord(deps.fetcher, env.DISCORD_WEBHOOK_URL, [`competitive-analysis self-check (${env.ENVIRONMENT}) failed:`, ...lines].join("\n"));
   }
-  if (new Date(now).getUTCDay() === 1) {
+  if (cron === SUMMARY_CRON && new Date(now).getUTCDay() === 1) {
     const fromDay = utcDay(now - 7 * DAY_MS);
     const toDay = utcDay(now - DAY_MS);
-    let rows: UsageRow[] = [];
+    let rows: UsageRow[];
     try {
       rows = await limitsStub(env).usage(fromDay, toDay);
     } catch {
-      return; // No counts to report; the next Monday will.
+      await postDiscord(deps.fetcher, env.DISCORD_WEBHOOK_URL, `competitive-analysis usage summary unavailable this week (${fromDay} to ${toDay})`);
+      return;
     }
     await postDiscord(deps.fetcher, env.DISCORD_WEBHOOK_URL, weeklySummary(rows, fromDay, toDay));
   }

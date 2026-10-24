@@ -13,7 +13,7 @@ export default {
   },
   async scheduled(controller, env, ctx): Promise<void> {
     ctx.waitUntil(
-      runScheduled(env, ctx, controller.scheduledTime, {
+      runScheduled(env, ctx, controller.cron, controller.scheduledTime, {
         run: runTool,
         fetcher: (input, init) => fetch(input, init),
       }),
