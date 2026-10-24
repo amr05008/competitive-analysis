@@ -67,8 +67,11 @@ export const MAX_THREADS = 10;
 
 /** The most upstream fetches sec_filings makes in one call. */
 export const SEC_MAX_FETCHES = 25;
-/** How long sec_filings may keep starting fetches, counted from the start of the call. */
-export const SEC_DEADLINE_MS = 25_000;
+/**
+ * How long sec_filings may keep starting fetches, counted from the start of the call. A request that hangs runs
+ * to its 10 s timeout, and the call targets 30 s.
+ */
+export const SEC_DEADLINE_MS = 18_000;
 /** How long an EDGAR answer is cached: one day. */
 export const TTL_EDGAR = 86_400;
 /** The most companies sec_filings returns. */

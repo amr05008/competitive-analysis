@@ -393,6 +393,25 @@ describe("sec_filings", () => {
     expect(result.notes.join(" ")).toMatch(/time limit/);
   });
 
+  it("starts no request after 18 s, so one that hangs to its 10 s timeout still ends the call under 30 s", async () => {
+    // Live, three Form D documents hung to the timeout; the last started at 24 s and the call took 34 s.
+    let clock = NOW;
+    const inner = fakeFetch(stripeRoutes());
+    const slow = Object.assign(
+      async (url: RequestInfo | URL, init?: RequestInit) => {
+        clock += 7_000; // every request takes seven seconds: they start at 0, 7 and 14 s
+        return inner(url, init);
+      },
+      { calls: inner.calls },
+    ) as FakeFetch;
+    const result = await secFilings({ company_name: "Stripe" }, await deps(slow, () => clock), {
+      sleep: async () => {},
+    });
+    expect(result.status).toBe("partial");
+    expect(result.notes.join(" ")).toContain("time limit of 18 s");
+    expect(inner.calls).toHaveLength(3);
+  });
+
   it("shortens lists to fit the response size", async () => {
     const many = Array.from({ length: 5 }, (_, i) => [String(300 + i), `Long ${i} ${"x".repeat(100)}`] as [string, string]);
     const routes: Record<string, Route> = { [`${SEARCH}Long`]: searchBody(many) };
