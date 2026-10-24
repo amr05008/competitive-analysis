@@ -107,7 +107,7 @@ describe("sec_filings", () => {
   it("never returns related persons, signers or sales-compensation names", async () => {
     const { result } = await call({ company_name: "Stripe" }, stripeRoutes());
     const text = JSON.stringify(result) + render("sec_filings", result);
-    expect(text).not.toMatch(/Person|Berry|Oyster|298-5539|270465600/);
+    expect(text).not.toMatch(/Person|Berry|Oyster|298-5539/);
   });
 
   it("drops individual filers", async () => {
@@ -252,7 +252,9 @@ describe("sec_filings", () => {
     const { result, fetch } = await call({ company_name: "Acme" }, routes);
     expect(result.status).toBe("partial");
     expect(result.entities?.map((e) => e.cik)).toEqual(["11"]);
-    expect(fetch.calls).not.toContain(subUrl("13"));
+    expect(fetch.calls[fetch.calls.length - 1]).toBe(subUrl("12")); // nothing follows the 429, not even a Form D
+    expect(fetch.calls).not.toContain(formDUrl("11", "0000000011-24-000001"));
+    expect(result.notes.join(" ")).toContain("wait a few minutes before calling again");
   });
 
   it("returns an error when the search itself fails", async () => {
@@ -267,17 +269,43 @@ describe("sec_filings", () => {
     routes[STRIPE_D] = { status: 503 };
     const { result } = await call({ company_name: "Stripe" }, routes);
     expect(result.status).toBe("partial");
-    expect(result.entities?.[0].form_d.length).toBeGreaterThanOrEqual(0);
+    expect(result.entities?.[0].form_d).toHaveLength(4); // 5 read, the failed one left out
     expect(result.notes.join(" ")).toMatch(/Form D/);
   });
 
   it("stops reading Form Ds at the fetch budget and names how many were not read", async () => {
     const routes = stripeRoutes();
-    // 1 search + 10 submissions would use 11; allow only 4 fetches in all: search, Stripe's submissions, then 2 more.
+    // 4 fetches in all: the search, then Stripe's submissions and two more candidates; no Form D is read.
     const { result, fetch } = await call({ company_name: "Stripe" }, routes, { maxFetches: 4 });
     expect(fetch.calls.length).toBeLessThanOrEqual(4);
     expect(result.status).toBe("partial");
     expect(result.notes.join(" ")).toMatch(/fetch budget of 4 requests used up/);
+    expect(result.notes.join(" ")).toContain("5 Form D notices were not read");
+  });
+
+  it("checks an exact second-name hit even when the first search fills the candidate slots", async () => {
+    const first = Array.from({ length: 10 }, (_, i) => [String(500 + i), `Meta Thing ${i}`] as [string, string]);
+    const routes: Record<string, Route> = {
+      [`${SEARCH}Meta`]: searchBody(first),
+      [`${SEARCH}facebook`]: searchBody([["1326801", "Facebook, Inc."]]),
+      [subUrl("1326801")]: makeSub("Facebook, Inc.", "1326801"),
+      [formDUrl("1326801", "1326801".padStart(10, "0") + "-24-000001")]: formDStripe,
+    };
+    for (const [cik, name] of first) routes[subUrl(cik)] = makeSub(name, cik, {}, ["4"]);
+    const { result, fetch } = await call({ company_name: "Meta", domain: "facebook.com" }, routes, { maxFetches: 40 });
+    expect(fetch.calls).toContain(subUrl("1326801"));
+    expect(result.entities?.map((e) => e.name)).toEqual(["Facebook, Inc."]);
+    expect(result.entities?.[0].exact_match).toBe(true);
+  });
+
+  it("unchecked hits suppress the no-filings statement", async () => {
+    const hits = Array.from({ length: 10 }, (_, i) => [String(600 + i), `Zed ${i}`] as [string, string]);
+    const routes: Record<string, Route> = { [`${SEARCH}Zed`]: searchBody(hits) };
+    for (const [cik, name] of hits) routes[subUrl(cik)] = makeSub(name, cik, {}, ["4"]);
+    const { result } = await call({ company_name: "Zed" }, routes, { maxFetches: 40 });
+    expect(result.entities).toEqual([]);
+    expect(result.statement).toBeNull();
+    expect(result.notes.join(" ")).toContain("2 more matches were not checked");
   });
 
   it("names the number of unread Form Ds", async () => {

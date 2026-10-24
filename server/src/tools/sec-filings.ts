@@ -8,7 +8,7 @@ import {
   filingFolder,
   getFormD,
   getSubmissions,
-  isPersonFiler,
+  isListableCompany,
   normalizeEntityName,
   searchEntities,
   type Submissions,
@@ -58,9 +58,10 @@ export async function secFilings(
   const budget = new Budget(maxFetches, deadlineMs, deps.now);
   const tried: string[] = [];
   let lastStart: number | null = null;
+  let rateLimited = false;
   // Every request passes through here: it counts against the budget and starts at least EDGAR_GAP_MS after the last.
   const gate: Fetcher = (async (url: RequestInfo | URL, init?: RequestInit) => {
-    if (!budget.take()) {
+    if (rateLimited || !budget.take()) {
       return new Response(null, { status: REFUSED_STATUS });
     }
     if (lastStart !== null) {
@@ -69,27 +70,34 @@ export async function secFilings(
     }
     lastStart = deps.now();
     tried.push(String(url));
-    return deps.fetch(url, init);
+    const res = await deps.fetch(url, init);
+    if (res.status === 429) rateLimited = true; // after any 429 no further EDGAR request is made in this call
+    return res;
   }) as Fetcher;
+  const halted = () => rateLimited || budget.exhausted;
   const stopReason = (): string =>
-    budget.used >= maxFetches
+    rateLimited
+      ? "EDGAR rate-limited the request"
+      : budget.used >= maxFetches
       ? `fetch budget of ${maxFetches} requests used up`
       : `time limit of ${Math.round(deadlineMs / 1000)} s reached`;
-  const again = "call again with the same input to continue, since answers already read are cached";
+  const advice = () =>
+    rateLimited
+      ? "wait a few minutes before calling again"
+      : "call again with the same input to continue, since answers already read are cached";
   const failText = (f: FailedOutcome) => `${f.reason}: ${clip(f.detail, MAX_DETAIL_CHARS)}`;
 
   const notes: string[] = [];
   let partial = false;
 
   // 1. Search each name.
-  const hits: { cik: string; name: string }[] = [];
-  const seen = new Set<string>();
+  const lists: { cik: string; exact: boolean }[][] = [];
   let searchesOk = 0;
   let firstSearchFailure: FailedOutcome | null = null;
   for (const n of namesTried) {
-    if (budget.exhausted) {
+    if (halted()) {
       partial = true;
-      notes.push(`${stopReason()}, so the name "${n}" was not searched; ${again}`);
+      notes.push(`${stopReason()}, so the name "${n}" was not searched; ${advice()}`);
       continue;
     }
     const r = await searchEntities(gate, deps.cache, n);
@@ -102,7 +110,7 @@ export async function secFilings(
       continue;
     }
     searchesOk++;
-    for (const h of r.hits) if (!seen.has(h.cik)) (seen.add(h.cik), hits.push(h));
+    lists.push(r.hits);
   }
   if (searchesOk === 0) {
     if (firstSearchFailure) return errorResult(firstSearchFailure.reason, firstSearchFailure.detail, tried, deps.now());
@@ -110,13 +118,22 @@ export async function secFilings(
   }
 
   // 2. Read each candidate's submissions; individuals are dropped here.
-  const candidates = hits.slice(0, MAX_CANDIDATES);
+  // Exact name matches first, then the searches' other hits taken in turn, then cut to the candidate limit.
+  const ordered: string[] = [];
+  const add = (cik: string) => void (ordered.includes(cik) || ordered.push(cik));
+  for (const l of lists) for (const h of l) if (h.exact) add(h.cik);
+  for (let i = 0; lists.some((l) => i < l.length); i++) for (const l of lists) if (i < l.length) add(l[i].cik);
+  const candidates = ordered.slice(0, MAX_CANDIDATES).map((cik) => ({ cik }));
+  const beyondLimit = ordered.length - candidates.length;
+  if (beyondLimit > 0) {
+    notes.push(`${plural(beyondLimit, "more match was", "more matches were")} not checked, because only the first ${MAX_CANDIDATES} are`);
+  }
   const found: { sub: Submissions; exact: boolean; stateMatch: boolean; order: number }[] = [];
   const failures: FailedOutcome[] = [];
   let unchecked = 0;
   let stopped = false;
   for (let i = 0; i < candidates.length; i++) {
-    if (budget.exhausted) {
+    if (halted()) {
       stopped = true;
       unchecked = candidates.length - i;
       break;
@@ -136,7 +153,7 @@ export async function secFilings(
       }
       continue;
     }
-    if (isPersonFiler(r.sub)) continue;
+    if (!isListableCompany(r.sub)) continue;
     found.push({
       sub: r.sub,
       exact: wanted.has(normalizeEntityName(r.sub.name)),
@@ -152,8 +169,8 @@ export async function secFilings(
   }
   if (stopped) {
     partial = true;
-    const why = failures.some((f) => f.reason === "source_rate_limited") && !budget.exhausted ? "EDGAR rate-limited the request" : stopReason();
-    if (unchecked > 0) notes.push(`${why}, so ${plural(unchecked, "match was", "matches were")} not checked; ${again}`);
+    const why = stopReason();
+    if (unchecked > 0) notes.push(`${why}, so ${plural(unchecked, "match was", "matches were")} not checked; ${advice()}`);
   }
 
   found.sort((a, b) => Number(b.stateMatch) - Number(a.stateMatch) || Number(b.exact) - Number(a.exact) || a.order - b.order);
@@ -170,7 +187,7 @@ export async function secFilings(
     const folder = (acc: string) => `${filingFolder(sub.cik, acc)}/${acc}-index.htm`;
     const formDs: FormDEntry[] = [];
     for (const f of sub.filings.filter((x) => x.form === "D" || x.form === "D/A").slice(0, MAX_FORM_D)) {
-      if (budget.exhausted) {
+      if (halted()) {
         skipped++;
         continue;
       }
@@ -208,14 +225,19 @@ export async function secFilings(
   }
   if (skipped > 0) {
     partial = true;
-    notes.push(`${plural(skipped, "Form D notice was", "Form D notices were")} not read: ${stopReason()}; ${again}`);
+    notes.push(`${plural(skipped, "Form D notice was", "Form D notices were")} not read: ${stopReason()}; ${advice()}`);
   }
   if (formDFailed > 0) {
     partial = true;
     notes.push(`${plural(formDFailed, "Form D notice", "Form D notices")} could not be read (${failText(formDFailure as FailedOutcome)})`);
   }
 
-  const nothing = entities.length === 0 && !partial;
+  if (rateLimited && !notes.some((n) => n.includes("wait a few minutes"))) {
+    partial = true;
+    notes.push("EDGAR rate-limited the request, so no further requests were made; wait a few minutes before calling again");
+  }
+
+  const nothing = entities.length === 0 && !partial && beyondLimit === 0;
   const assemble = (filingCount: number, formDCount: number, entityCount: number): SecResult => {
     const shortened = filingCount < MAX_FILINGS || formDCount < MAX_FORM_D || entityCount < entities.length;
     return {

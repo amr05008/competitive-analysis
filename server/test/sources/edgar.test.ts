@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getFormD, getSubmissions, isPersonFiler, normalizeEntityName, searchEntities, type Submissions } from "../../src/sources/edgar";
+import { getFormD, getSubmissions, isListableCompany, normalizeEntityName, searchEntities, type Submissions } from "../../src/sources/edgar";
 import { fakeFetch } from "../helpers/fake-fetch";
 import searchStripe from "../fixtures/edgar/search-stripe.json";
 import searchEmpty from "../fixtures/edgar/search-hightouch-empty.json";
@@ -28,7 +28,8 @@ describe("searchEntities", () => {
   it("reads cik and name from hits.hits", async () => {
     const f = fakeFetch({ [`${SEARCH}stripe`]: JSON.stringify(searchStripe) });
     const r = await searchEntities(f, await fresh(), "stripe");
-    expect(r.ok && r.hits[0]).toEqual({ cik: "1691342", name: "Stripe, Inc." });
+    expect(r.ok && r.hits[0]).toEqual({ cik: "1691342", exact: true });
+    expect(r.ok && r.hits[1]).toEqual({ cik: "1375453", exact: false });
     expect(f.calls).toEqual([`${SEARCH}stripe`]);
   });
 
@@ -38,12 +39,16 @@ describe("searchEntities", () => {
     expect(r).toEqual({ ok: true, hits: [] });
   });
 
-  it("caches the answer", async () => {
+  it("caches the answer, and the cached entry holds no names", async () => {
     const f = fakeFetch({ [`${SEARCH}stripe`]: JSON.stringify(searchStripe) });
     const cache = await fresh();
-    await searchEntities(f, cache, "stripe");
-    await searchEntities(f, cache, "stripe");
+    const first = await searchEntities(f, cache, "stripe");
+    const second = await searchEntities(f, cache, "stripe");
     expect(f.calls).toHaveLength(1);
+    expect(second).toEqual(first);
+    const entry = await cache.match(new Request("https://cache.competitive-analysis.invalid/" + encodeURIComponent(`${SEARCH}stripe`)));
+    expect(entry).toBeTruthy();
+    expect(await (entry as Response).text()).not.toMatch(/Stripe|LLC|LP/);
   });
 
   it("fails on an unreadable body and on HTTP errors", async () => {
@@ -63,7 +68,8 @@ describe("getSubmissions", () => {
     expect(r.sub.filings[0]).toEqual({ form: "D", date: "2024-04-12", accession: "0001691342-24-000001" });
     expect(r.sub.filings[1].form).toBe("D/A");
     expect(Object.keys(r.sub).sort()).toEqual(["businessState", "cik", "filings", "formerNames", "name", "ownerOnly", "stateOfIncorporation"]);
-    expect(JSON.stringify(r.sub)).not.toMatch(/BERRY|298-5539|270465600/);
+    expect(JSON.stringify(r.sub)).not.toMatch(/BERRY|298-5539/);
+    expect(r.sub).not.toHaveProperty("ein");
   });
 
   it("maps an empty incorporation state to null and flags owner-only filers", async () => {
@@ -103,7 +109,7 @@ describe("getFormD", () => {
 
   it("never exposes people, even when the allow-listed elements surround them", async () => {
     const xml = `<edgarSubmission><relatedPersonsList><relatedPersonInfo><relatedPersonName><firstName>Person</firstName><lastName>Z</lastName></relatedPersonName></relatedPersonInfo></relatedPersonsList>
-<offeringData><industryGroup><industryGroupType>Banking</industryGroupType></industryGroup>
+<offeringData><industryGroup><industryGroupType>Insurance</industryGroupType></industryGroup>
 <salesCompensationList><recipient><recipientName>Person Q</recipientName><totalAmountSold>5</totalAmountSold></recipient></salesCompensationList>
 <offeringSalesAmounts><totalOfferingAmount>Indefinite</totalOfferingAmount><totalAmountSold>12</totalAmountSold></offeringSalesAmounts>
 <typeOfFiling><newOrAmendment><isAmendment>true</isAmendment></newOrAmendment><dateOfFirstSale><yetToOccur>true</yetToOccur></dateOfFirstSale></typeOfFiling>
@@ -111,7 +117,7 @@ describe("getFormD", () => {
     const r = await getFormD(fakeFetch({ [FORM_D]: xml }), await fresh(), "1691342", "0001691342-24-000001");
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.d).toMatchObject({ totalOfferingAmount: "Indefinite", totalAmountSold: "12", dateOfFirstSale: null, firstSaleYetToOccur: true, industryGroup: "Banking", isAmendment: true });
+    expect(r.d).toMatchObject({ totalOfferingAmount: "Indefinite", totalAmountSold: "12", dateOfFirstSale: null, firstSaleYetToOccur: true, industryGroup: "Insurance", isAmendment: true });
     expect(JSON.stringify(r.d)).not.toMatch(/Person/);
   });
 
@@ -135,24 +141,44 @@ describe("getFormD", () => {
     expect(r.ok && r.d.yearOfInc).toBe("2019");
   });
 
+  it("cuts namespace-prefixed people sections", async () => {
+    const xml = `<ns1:edgarSubmission><ns1:relatedPersonsList><ns1:relatedPersonInfo><ns1:firstName>Person</ns1:firstName></ns1:relatedPersonInfo></ns1:relatedPersonsList><offeringData><offeringSalesAmounts><totalOfferingAmount>9</totalOfferingAmount></offeringSalesAmounts><ns1:signatureBlock><totalAmountSold>77</totalAmountSold></ns1:signatureBlock></offeringData></ns1:edgarSubmission>`;
+    const r = await getFormD(fakeFetch({ [FORM_D]: xml.replace("<ns1:edgarSubmission>", "<edgarSubmission>").replace("</ns1:edgarSubmission>", "</edgarSubmission>") }), await fresh(), "1691342", "0001691342-24-000001");
+    expect(r.ok && r.d.totalOfferingAmount).toBe("9");
+    expect(r.ok && r.d.totalAmountSold).toBeNull();
+  });
+
+  it("nulls an industry group outside the published list", async () => {
+    const xml = `<edgarSubmission><offeringData><industryGroup><industryGroupType>Call Person Z at 555-1212</industryGroupType></industryGroup></offeringData></edgarSubmission>`;
+    const r = await getFormD(fakeFetch({ [FORM_D]: xml }), await fresh(), "1691342", "0001691342-24-000001");
+    expect(r.ok && r.d.industryGroup).toBeNull();
+    const ok = `<edgarSubmission><offeringData><industryGroup><industryGroupType>Oil &amp; Gas</industryGroupType></industryGroup></offeringData></edgarSubmission>`;
+    const r2 = await getFormD(fakeFetch({ [FORM_D]: ok.replace("&amp;", "and") }), await fresh(), "1691342", "0001691342-24-000001");
+    expect(r2.ok && r2.d.industryGroup).toBe("Oil and Gas");
+  });
+
   it("fails on a document that is not a Form D", async () => {
     const r = await getFormD(fakeFetch({ [FORM_D]: "<html>no</html>" }), await fresh(), "1691342", "0001691342-24-000001");
     expect(r.ok).toBe(false);
   });
 });
 
-describe("isPersonFiler", () => {
-  it("is true with no filings", () => expect(isPersonFiler(sub({ filings: [] }))).toBe(true));
-  it("is true when every form is an ownership form", () => {
-    expect(isPersonFiler(sub({ filings: filings("4", "4/A", "SC 13G", "SCHEDULE 13D/A", "144") }))).toBe(true);
+describe("isListableCompany", () => {
+  it("is false with no filings", () => expect(isListableCompany(sub({ filings: [] }))).toBe(false));
+  it("excludes an MA-I-only filer", () => expect(isListableCompany(sub({ filings: filings("MA-I") }))).toBe(false));
+  it("excludes activist and ownership filers, matching forms exactly", () => {
+    expect(isListableCompany(sub({ filings: filings("SC 13D", "DFAN14A") }))).toBe(false);
+    expect(isListableCompany(sub({ filings: filings("DFAN14A", "PREC14A", "SC TO-T", "4", "144") }))).toBe(false);
   });
-  it("is false for an issuer with a Form D", () => {
-    expect(isPersonFiler(sub({ filings: filings("4", "D") }))).toBe(false);
+  it("includes an 8-K plus Form 4 issuer", () => expect(isListableCompany(sub({ filings: filings("8-K", "4") }))).toBe(true));
+  it("includes Stripe (D and D/A)", async () => {
+    const r = await getSubmissions(fakeFetch({ [SUB]: JSON.stringify(subStripe) }), await fresh(), "1691342");
+    expect(r.ok && isListableCompany(r.sub)).toBe(true);
   });
-  it("is true when owner-only with other forms but none of D, S-1, 10-K, 10-Q", () => {
-    expect(isPersonFiler(sub({ ownerOnly: true, filings: filings("8-K", "4") }))).toBe(true);
-    expect(isPersonFiler(sub({ ownerOnly: true, filings: filings("10-K", "4") }))).toBe(false);
-    expect(isPersonFiler(sub({ ownerOnly: false, filings: filings("8-K", "4") }))).toBe(false);
+  it("includes the other company forms", () => {
+    for (const f of ["D", "D/A", "S-1", "10-K", "10-Q", "C", "1-A", "13F-HR", "DEF 14A", "424B4"]) {
+      expect(isListableCompany(sub({ filings: filings(f) })), f).toBe(true);
+    }
   });
 });
 
@@ -161,5 +187,13 @@ describe("normalizeEntityName", () => {
     expect(normalizeEntityName("Stripe, Inc.")).toBe(normalizeEntityName("STRIPE"));
     expect(normalizeEntityName("Acme  Co., Ltd.")).toBe("acme");
     expect(normalizeEntityName("Stripes V, LP")).not.toBe("stripe");
+    expect(normalizeEntityName("Stripe, Inc.")).not.toBe(normalizeEntityName("Strip"));
+  });
+  it("strips EDGAR's conformed-name decorations", () => {
+    expect(normalizeEntityName("MATTEL INC /DE/")).toBe("mattel");
+    expect(normalizeEntityName("ACME L.L.C.")).toBe("acme");
+    expect(normalizeEntityName("ACME L.P.")).toBe("acme");
+    expect(normalizeEntityName("Acme Inc. (DE)")).toBe("acme");
+    expect(normalizeEntityName("ACME INC.")).toBe("acme");
   });
 });

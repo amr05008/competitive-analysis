@@ -3,13 +3,28 @@ import { cached } from "../shared/cache";
 import { politeFetch, type FailedOutcome, type Fetcher } from "../shared/http";
 import { cleanCompanyName } from "../shared/inputs";
 
-/** Filing forms that individuals file about themselves; an entity with only these is a person, not a company. */
-export const OWNERSHIP_FORMS = new Set([
-  "3", "4", "5", "3/A", "4/A", "5/A", "144", "144/A",
-  "SC 13D", "SC 13D/A", "SC 13G", "SC 13G/A",
-  "SCHEDULE 13D", "SCHEDULE 13D/A", "SCHEDULE 13G", "SCHEDULE 13G/A",
+/**
+ * Forms a company files. An entity is listed only if it has filed at least one of these, matched exactly
+ * (never by prefix): individuals file ownership, activist and broker forms, which are not in this set.
+ */
+export const COMPANY_FORMS = new Set([
+  "D", "D/A", "S-1", "S-1/A", "F-1", "10-K", "10-K/A", "10-Q", "10-Q/A", "8-K", "8-K/A", "20-F", "40-F", "6-K",
+  "10-12B", "10-12G", "C", "C/A", "C-U", "C-AR", "1-A", "1-A/A", "1-K", "1-SA", "1-U",
+  "13F-HR", "13F-HR/A", "N-CSR", "N-PORT-P", "DEF 14A", "424B4",
 ]);
-const ISSUER_FORMS = new Set(["D", "D/A", "S-1", "10-K", "10-Q"]);
+
+/** The industry groups a Form D can name. Any other value is treated as absent. */
+const INDUSTRY_GROUPS = [
+  "Agriculture", "Banking and Financial Services", "Commercial Banking", "Insurance", "Investing", "Investment Banking",
+  "Pooled Investment Fund", "Other Banking and Financial Services", "Business Services", "Energy", "Coal Mining",
+  "Electric Utilities", "Energy Conservation", "Environmental Services", "Oil and Gas", "Other Energy", "Health Care",
+  "Biotechnology", "Health Insurance", "Hospitals and Physicians", "Pharmaceuticals", "Other Health Care",
+  "Manufacturing", "Real Estate", "Commercial", "Construction", "REITS and Finance", "Residential", "Other Real Estate",
+  "Retailing", "Restaurants", "Technology", "Computers", "Telecommunications", "Other Technology", "Travel",
+  "Airlines and Airports", "Lodging and Conventions", "Tourism and Travel Services", "Other Travel", "Other",
+];
+const industryKey = (s: string) => s.toLowerCase().replace(/&/g, "and").replace(/\s+/g, " ").trim();
+const INDUSTRY_BY_KEY = new Map(INDUSTRY_GROUPS.map((g) => [industryKey(g), g]));
 
 /** The most recent filings kept per company, besides every Form D. */
 const KEEP_FILINGS = 100;
@@ -82,21 +97,26 @@ async function fetchParsed<T>(
   return failure ?? unreadable(url, what);
 }
 
-/** EDGAR's company typeahead. Its hits are suggestions, so they include funds, SPVs and individuals. */
+/**
+ * EDGAR's company typeahead. Its hits are suggestions, so they include funds, SPVs and individuals. Only the
+ * CIKs, their order and whether each name equals the name searched are cached or returned; names come from
+ * submissions, so an individual's name never reaches the cache.
+ */
 export async function searchEntities(
   fetcher: Fetcher,
   cache: Cache,
   name: string,
-): Promise<{ ok: true; hits: { cik: string; name: string }[] } | FailedOutcome> {
+): Promise<{ ok: true; hits: { cik: string; exact: boolean }[] } | FailedOutcome> {
   const url = `https://efts.sec.gov/LATEST/search-index?keysTyped=${encodeURIComponent(name)}`;
+  const wanted = normalizeEntityName(name);
   const r = await fetchParsed(fetcher, cache, url, 500_000, (text) => {
     const hits = obj(obj(parseJson(text)?.hits))?.hits;
     if (!Array.isArray(hits)) return null;
-    const out: { cik: string; name: string }[] = [];
+    const out: { cik: string; exact: boolean }[] = [];
     for (const h of hits) {
       const id = str(obj(h)?._id);
       const entity = str(obj(obj(h)?._source)?.entity);
-      if (id && /^\d+$/.test(id) && entity) out.push({ cik: id, name: entity.slice(0, MAX_NAME_CHARS) });
+      if (id && /^\d+$/.test(id) && entity) out.push({ cik: id, exact: normalizeEntityName(entity) === wanted });
       if (out.length >= MAX_HITS) break;
     }
     return out;
@@ -162,16 +182,20 @@ const PEOPLE_ELEMENTS = ["relatedPersonsList", "signatureBlock", "salesCompensat
 function stripPeople(xml: string): string {
   let out = xml;
   for (const tag of PEOPLE_ELEMENTS) {
+    const open = new RegExp(`<(?:\\w+:)?${tag}(?=[\\s/>])`);
+    const selfClosed = new RegExp(`^<(?:\\w+:)?${tag}[^>]*/>`);
+    const close = new RegExp(`</(?:\\w+:)?${tag}\\s*>`);
     for (;;) {
-      const open = out.search(new RegExp(`<${tag}(?=[\\s/>])`));
-      if (open < 0) break;
-      const selfClosed = new RegExp(`^<${tag}[^>]*/>`).exec(out.slice(open));
-      if (selfClosed) {
-        out = out.slice(0, open) + out.slice(open + selfClosed[0].length);
+      const at = out.search(open);
+      if (at < 0) break;
+      const self = selfClosed.exec(out.slice(at));
+      if (self) {
+        out = out.slice(0, at) + out.slice(at + self[0].length);
         continue;
       }
-      const close = out.indexOf(`</${tag}>`, open);
-      out = close < 0 ? out.slice(0, open) : out.slice(0, open) + out.slice(close + tag.length + 3);
+      const rest = out.slice(at);
+      const end = close.exec(rest);
+      out = end ? out.slice(0, at) + rest.slice(end.index + end[0].length) : out.slice(0, at);
     }
   }
   return out;
@@ -206,7 +230,7 @@ export function parseFormD(raw: string): FormDFields | null {
     totalAmountSold: amount("totalAmountSold"),
     dateOfFirstSale: saleDate && /^\d{4}-\d{2}-\d{2}$/.test(saleDate) ? saleDate : null,
     firstSaleYetToOccur: !!firstSale && /<yetToOccur>\s*true\s*</.test(firstSale),
-    industryGroup: industry && /^[\w ,&/().'-]{1,100}$/.test(industry) ? industry : null,
+    industryGroup: (industry && INDUSTRY_BY_KEY.get(industryKey(industry))) || null,
     yearOfInc,
     isAmendment: text(xml, "isAmendment") === "true",
   };
@@ -230,17 +254,20 @@ export async function getFormD(
 
 // ----------------------------------------------------------------- helpers
 
-/** True when the record belongs to an individual or has nothing to show a company by. */
-export function isPersonFiler(sub: Submissions): boolean {
-  if (sub.filings.length === 0) return true;
-  if (sub.filings.every((f) => OWNERSHIP_FORMS.has(f.form.toUpperCase()))) return true;
-  return sub.ownerOnly && !sub.filings.some((f) => ISSUER_FORMS.has(f.form.toUpperCase()));
+/** True when the entity has filed at least one form that only companies file (exact match, no prefixes). */
+export function isListableCompany(sub: Submissions): boolean {
+  return sub.filings.some((f) => COMPANY_FORMS.has(f.form.toUpperCase()));
 }
 
-/** A name for comparing: no case, punctuation or trailing legal-form words. */
+/** A name for comparing: no case, punctuation, EDGAR state tags such as /DE/ or (DE), or trailing legal-form words. */
 export function normalizeEntityName(s: string): string {
-  return cleanCompanyName(s)
+  const undecorated = s
+    .replace(/\s*\/[A-Za-z]{2,3}\/\s*$/, "")
+    .replace(/\s*\(\s*[A-Za-z]{2}\s*\)\s*$/, "")
+    .replace(/\b(?:[A-Za-z]\.){2,}/g, (m) => m.replace(/\./g, ""));
+  return cleanCompanyName(undecorated)
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim();
+    .trim()
+    .replace(/ (?:lp|llp|lllp)$/, "");
 }
