@@ -39,11 +39,15 @@ function publicHost(raw: string): { ok: true; host: string; path: string } | Bad
   return { ok: true, host, path: u.pathname };
 }
 
+/**
+ * A page address without trailing slashes, except that a homepage keeps its one slash: the Wayback Machine
+ * stores homepage captures as https://host/ and answers https://host with a redirect, a second request per capture.
+ */
 export function normalizePageUrl(s: string): { ok: true; url: string; cdxKey: string } | Bad {
   const r = publicHost(s);
   if (!r.ok) return r;
   const path = r.path.replace(/\/+$/, "");
-  return { ok: true, url: `https://${r.host}${path}`, cdxKey: `${r.host}${path}` };
+  return { ok: true, url: `https://${r.host}${path || "/"}`, cdxKey: `${r.host}${path}` };
 }
 
 export function normalizeDomain(s: string): { ok: true; domain: string } | Bad {

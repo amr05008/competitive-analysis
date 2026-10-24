@@ -7,8 +7,9 @@ describe("normalizePageUrl", () => {
   it.each(["hightouch.com/pricing", "https://www.hightouch.com/pricing/", "HTTP://Hightouch.com/pricing?ref=x#top"])("normalizes %s", (s) => {
     expect(normalizePageUrl(s)).toEqual({ ok: true, url: "https://hightouch.com/pricing", cdxKey: "hightouch.com/pricing" });
   });
-  it.each(["https://hightouch.com", "https://hightouch.com/"])("root %s", (s) => {
-    expect(normalizePageUrl(s)).toMatchObject({ ok: true, cdxKey: "hightouch.com" });
+  it.each(["https://hightouch.com", "https://hightouch.com/", "www.hightouch.com", "https://hightouch.com//"])("root %s", (s) => {
+    // A homepage keeps its slash: the archive stores it as https://hightouch.com/ and redirects the bare form.
+    expect(normalizePageUrl(s)).toEqual({ ok: true, url: "https://hightouch.com/", cdxKey: "hightouch.com" });
   });
   it.each(BAD)("rejects %j", (s) => {
     expect(normalizePageUrl(s).ok).toBe(false);

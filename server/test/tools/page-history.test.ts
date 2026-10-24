@@ -392,6 +392,18 @@ describe("page_history: output", () => {
     }
   });
 
+  it("a homepage's captures are fetched at the address the archive stores, so none needs a redirect", async () => {
+    // The archive keeps homepage captures under https://example.com/ and answers the bare
+    // https://example.com with a redirect to it, which costs a second request every time.
+    const fake = fakeArchive(copies((i) => (i < 13 ? "Alpha" : "Bravo")));
+    const r = await call({ ...JAN, url: "https://example.com" }, fake);
+    const captures = fake.calls.filter((u) => u.includes("id_/"));
+    expect(captures.length).toBeGreaterThan(0);
+    for (const u of captures) expect(u).toMatch(/id_\/https:\/\/example\.com\/$/);
+    expect(r.url).toBe("https://example.com/");
+    expect(r.changes![0].after.link).toBe(`https://web.archive.org/web/${ts(13)}/https://example.com/`);
+  });
+
   it("the largest result stays under the cap", async () => {
     const r = await call({ ...JAN, max_changes: 15 }, fakeArchive(worstCase()));
     expect(r.changes!.length).toBeGreaterThan(0);
