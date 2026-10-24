@@ -1,6 +1,8 @@
 import { aboutPage } from "./about";
 import { handleMcp } from "./mcp";
 
+export { Limits } from "./shared/limits";
+
 export default {
   async fetch(req, env, ctx): Promise<Response> {
     const { pathname } = new URL(req.url);

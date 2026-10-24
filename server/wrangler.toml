@@ -16,3 +16,13 @@ enabled = false
 [vars]
 ENVIRONMENT = "dev"
 DAILY_TOOL_CALL_CAP = "200"
+
+# One global instance (idFromName("global")): the archive gate, the daily call
+# cap and anonymous usage counts.
+[[durable_objects.bindings]]
+name = "LIMITS"
+class_name = "Limits"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Limits"]

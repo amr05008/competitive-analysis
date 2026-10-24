@@ -2,30 +2,60 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
 import { SERVER_NAME, SERVER_VERSION } from "./config";
-import { outputObject } from "./contract/envelope";
-import { TOOLS, type ToolResult } from "./contract/tools";
-import { politeFetch } from "./shared/http";
+import { errorResult, outputObject } from "./contract/envelope";
+import { TOOLS, type ToolName, type ToolResult } from "./contract/tools";
+import { limitsStub } from "./shared/limits";
+import { outcomeOf } from "./shared/usage-store";
 import { IMPLEMENTATIONS, render, type ToolDeps } from "./tools";
 
-export function makeDeps(_env: Env): ToolDeps {
+export function makeDeps(env: Env): ToolDeps {
   return {
     // Wrapped, not passed bare: workerd throws "Illegal invocation" when fetch
     // is called as a method of another object, as in deps.fetch(url).
     fetch: (input, init) => fetch(input, init),
-    archive: (url, opts) => politeFetch((input, init) => fetch(input, init), url, opts),
+    // Every archive request goes through the one server-wide gate.
+    archive: (url, opts) => limitsStub(env).archiveFetch(url, opts),
     cache: caches.default,
     now: () => Date.now(),
   };
 }
 
-export function buildServer(env: Env, _ctx: ExecutionContext): McpServer {
+/**
+ * Runs one tool call under the daily cap, then counts its outcome. The count
+ * is written after the response, and a failure to write it never fails the
+ * call. Tool inputs are never recorded.
+ */
+export async function runTool(
+  name: ToolName,
+  input: unknown,
+  env: Env,
+  ctx: ExecutionContext,
+  opts: { selfCheck: boolean },
+): Promise<ToolResult> {
+  const limits = limitsStub(env);
+  let allowed: boolean;
+  try {
+    ({ allowed } = await limits.admit(name, opts.selfCheck));
+  } catch {
+    // The Limits object can't be reached (say, a free-plan limit): fail closed.
+    return errorResult("server_busy", "the server's limits are unavailable; try again later", []);
+  }
+  if (!allowed) return errorResult("server_busy", "daily limit reached; try again after 00:00 UTC", []);
+  // Inputs arrive checked against the tool's input schema: by the SDK for MCP
+  // calls, and written in code for the self-check.
+  const implementation = IMPLEMENTATIONS[name] as (input: unknown, deps: ToolDeps) => Promise<ToolResult>;
+  const result = await implementation(input, makeDeps(env));
+  const recording = (async () => limits.record(name, outcomeOf(result), opts.selfCheck))().catch(() => {});
+  ctx.waitUntil(recording);
+  return result;
+}
+
+export function buildServer(env: Env, ctx: ExecutionContext): McpServer {
   const server = new McpServer(
     { name: SERVER_NAME, version: SERVER_VERSION },
     { jsonSchemaValidator: new CfWorkerJsonSchemaValidator() },
   );
   for (const tool of TOOLS) {
-    // The SDK has already checked the input against the tool's input schema.
-    const implementation = IMPLEMENTATIONS[tool.name] as (input: unknown, deps: ToolDeps) => Promise<ToolResult>;
     server.registerTool(
       tool.name,
       {
@@ -36,7 +66,7 @@ export function buildServer(env: Env, _ctx: ExecutionContext): McpServer {
         annotations: tool.annotations,
       },
       async (input) => {
-        const result = await implementation(input, makeDeps(env));
+        const result = await runTool(tool.name, input, env, ctx, { selfCheck: false });
         return {
           structuredContent: result,
           content: [{ type: "text", text: render(tool.name, result) }],
