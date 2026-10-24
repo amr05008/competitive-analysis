@@ -25,18 +25,19 @@ about page. This folder is public code, and it never goes in the plugin zip.
 ```bash
 npm install
 npm test            # every test, inside workerd
-npm run typecheck
+npm run typecheck   # the Worker, then scripts/ with Node's types
 npm run dev         # a local server at http://localhost:8787
-npm run live -- --url http://localhost:8787/mcp [--out results.json]
+npm run live -- --url http://localhost:8787/mcp --out ../plans/live-YYYY-MM-DD-local.json
                     # live checks against real Hightouch and ZeroClick data
 ```
 
 `npm run live` is a client only: it calls a running server's tools with real inputs, prints
 each call's status, wall time, fetches and key facts, and with `--out` writes the full results
 as JSON. A `page_history` call that comes back partial is made once more with the same input,
-since captures already read are cached. It reaches the Wayback Machine, EDGAR, Hacker News
-search and the job boards, so run it sparingly. Its results name real companies; keep them out
-of this folder.
+since captures already read are cached. It exits non-zero when a call fails, a result doesn't
+match its output schema, or a call takes 30 s or more. It reaches the Wayback Machine, EDGAR,
+Hacker News search and the job boards, so run it sparingly. Its results name real companies,
+so `--out` refuses any path in the repo outside the ignored `plans/` folder.
 
 ## The contract only grows
 

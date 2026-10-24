@@ -7,7 +7,12 @@
 // A page_history call that comes back partial is made a second time with the
 // same input: captures already read are cached, so the second call continues.
 // Each call's structured result is checked against the tool's output schema.
-import { writeFileSync } from "node:fs";
+// It exits non-zero when a call fails or errors, a result doesn't match its
+// schema, or a call takes 30 s or more. Results name real companies, so --out
+// refuses a path inside the repo unless it's under plans/ (private, ignored).
+import { realpathSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -45,7 +50,31 @@ function args(argv: string[]): { url: string; out: string | null } {
     else throw new Error(`unknown argument: ${argv[i]}`);
   }
   if (!url) throw new Error("usage: npm run live -- --url <mcp url> [--out <file>]");
-  return { url, out };
+  return { url, out: out === null ? null : outPath(out) };
+}
+
+/** The real path, or the path as given when it doesn't exist yet. */
+function real(p: string): string {
+  try {
+    return realpathSync(p);
+  } catch {
+    return p;
+  }
+}
+
+/** The resolved --out path, refused when it lands in the repo outside plans/ (compared after symlinks). */
+function outPath(out: string): string {
+  const target = resolve(out);
+  const dir = real(dirname(target));
+  const repo = real(fileURLToPath(new URL("../../", import.meta.url)));
+  const plans = real(join(repo, "plans"));
+  const within = (p: string, root: string) => p === root || p.startsWith(root.endsWith(sep) ? root : root + sep);
+  if (within(dir, repo) && !within(dir, plans)) {
+    throw new Error(
+      `--out ${out} is inside the repo; results name real companies, so write them under plans/, such as ../plans/live-YYYY-MM-DD-local.json`,
+    );
+  }
+  return target;
 }
 
 const clip = (s: unknown, max = 90): string => {
@@ -209,18 +238,22 @@ async function main(): Promise<void> {
   await client.close();
 
   const slow = outcomes.filter((o) => o.seconds >= TARGET_SECONDS);
-  const failed = outcomes.filter((o) => o.status === "call failed" || o.schema_ok === false);
+  const failed = outcomes.filter((o) => !["ok", "partial"].includes(o.status) || o.schema_ok === false);
   console.log("\n== Summary");
   for (const o of outcomes) {
     console.log(
       `${o.label.padEnd(10)} ${o.tool.padEnd(21)} ${o.status.padEnd(8)} ${o.seconds.toFixed(1).padStart(5)} s  fetches ${o.fetches ?? "-"}`,
     );
   }
-  console.log(`slowest: ${Math.max(...outcomes.map((o) => o.seconds)).toFixed(1)} s; ${slow.length} at or over ${TARGET_SECONDS} s; ${failed.length} failed calls or schema mismatches`);
+  console.log(`slowest: ${Math.max(...outcomes.map((o) => o.seconds)).toFixed(1)} s; ${slow.length} at or over ${TARGET_SECONDS} s; ${failed.length} failed calls, errors or schema mismatches`);
 
   if (out) {
     writeFileSync(out, `${JSON.stringify({ server: url, run_at: new Date().toISOString(), calls: outcomes }, null, 2)}\n`);
     console.log(`wrote ${out}`);
+  }
+  if (slow.length || failed.length) {
+    console.log(`FAIL: ${[...new Set([...failed, ...slow].map((o) => o.label))].join(", ")}`);
+    process.exitCode = 1;
   }
 }
 
