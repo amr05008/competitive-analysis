@@ -1,11 +1,14 @@
-/** Caps a tool call's upstream fetches and wall-clock time. `deadlineMs` is an absolute `now()` value. */
+/** Caps a tool call's upstream fetches and wall-clock time. `durationMs` is counted from construction. */
 export class Budget {
   #used = 0;
+  readonly #deadline: number;
   constructor(
     private readonly maxFetches: number,
-    private readonly deadlineMs: number,
+    durationMs: number,
     private readonly now: () => number,
-  ) {}
+  ) {
+    this.#deadline = now() + durationMs;
+  }
 
   take(): boolean {
     if (this.exhausted) return false;
@@ -18,6 +21,6 @@ export class Budget {
   }
 
   get exhausted(): boolean {
-    return this.#used >= this.maxFetches || this.now() > this.deadlineMs;
+    return this.#used >= this.maxFetches || this.now() > this.#deadline;
   }
 }

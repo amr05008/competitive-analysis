@@ -8,11 +8,13 @@ describe("Budget", () => {
     expect(b.used).toBe(2);
     expect(b.exhausted).toBe(true);
   });
-  it("refuses after the deadline", () => {
-    let t = 0;
+  it("counts the duration from construction", () => {
+    let t = 5000;
     const b = new Budget(5, 100, () => t);
     expect(b.take()).toBe(true);
-    t = 101;
+    t = 5100;
+    expect(b.take()).toBe(true);
+    t = 5101;
     expect(b.take()).toBe(false);
     expect(b.exhausted).toBe(true);
   });
