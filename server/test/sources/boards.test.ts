@@ -187,6 +187,15 @@ describe("board absence", () => {
   });
 });
 
+describe("board cache keys", () => {
+  it("carry the adapter and its version", async () => {
+    const cache = await freshCache();
+    await fetchBoard(fakeFetch({ [LEVER]: json(lever) }), cache, "lever", "palantir");
+    const key = `https://cache.competitive-analysis.invalid/${encodeURIComponent("boards:v1:lever:palantir")}`;
+    expect(await cache.match(key)).toBeDefined();
+  });
+});
+
 describe("fetchRoleDetail", () => {
   const DETAIL = `https://boards-api.greenhouse.io/v1/boards/stripe/jobs/${ghDetail.id}?pay_transparency=true`;
 

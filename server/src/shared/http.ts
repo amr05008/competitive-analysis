@@ -10,6 +10,13 @@ export type FetchOutcome =
 
 export type FailedOutcome = Extract<FetchOutcome, { ok: false }>;
 
+/**
+ * The status of a request this server declined to make because the call's own limits ran out: its fetch
+ * budget, its time, or the per-request subrequest limit. No upstream sends it, so tools read it as their
+ * budget running out, never as a source failing.
+ */
+export const REFUSED_STATUS = 599;
+
 export type ArchiveFetch = (
   url: string,
   opts?: { timeoutMs?: number; maxBytes?: number },

@@ -2,9 +2,10 @@ import { HN_DEADLINE_MS, HN_MAX_FETCHES, MAX_THREADS, RESPONSE_CAP_CHARS } from 
 import { errorResult, utcDay } from "../contract/envelope";
 import type { HnInput, HnResult } from "../contract/tools";
 import { Budget } from "../shared/budget";
-import type { FailedOutcome, Fetcher } from "../shared/http";
+import { REFUSED_STATUS, type FailedOutcome, type Fetcher } from "../shared/http";
 import { normalizeDomain } from "../shared/inputs";
-import { phrase, searchHn, type HnHit } from "../sources/hn";
+import { limitReached } from "../shared/subrequests";
+import { phrase, searchHn, searchYear, type HnHit } from "../sources/hn";
 import type { ToolDeps } from ".";
 
 type Year = NonNullable<HnResult["years"]>[number];
@@ -15,8 +16,6 @@ const SAMPLE_TITLES = 3;
 const THREAD_POOL = 20;
 const MAX_TITLE_CHARS = 200;
 const MAX_DETAIL_CHARS = 200;
-/** What the gate answers with once the budget or clock has run out: a status no search sends. */
-const REFUSED_STATUS = 599;
 
 const clip = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
 
@@ -44,21 +43,32 @@ export async function hackerNewsMentions(
   const query = input.query.replace(/"/g, " ").replace(/\s+/g, " ").trim();
   if (query.length < 2) return errorResult("bad_input", "the name needs at least 2 characters besides quotes", [], deps.now());
 
-  const budget = new Budget(maxFetches, deadlineMs, deps.now);
+  // Each search needs room for itself and the year's cache write.
+  const budget = new Budget(maxFetches, deadlineMs, deps.now, { subrequests: deps.subrequests, reserve: 2 });
   const tried: string[] = [];
-  let refused = false;
+  /** Requests the gate, or the subrequest counter below it, declined to make. */
+  let refusals = 0;
   const gate: Fetcher = (async (url: RequestInfo | URL, init?: RequestInit) => {
-    if (budget.take()) {
-      tried.push(String(url));
-      return deps.fetch(url, init);
+    if (!budget.take()) {
+      refusals++;
+      return new Response(null, { status: REFUSED_STATUS });
     }
-    refused = true;
-    return new Response(null, { status: REFUSED_STATUS });
+    tried.push(String(url));
+    const res = await deps.fetch(url, init);
+    if (res.status === REFUSED_STATUS) refusals++;
+    return res;
   }) as Fetcher;
-  const stopNote = (what: string): string =>
-    budget.used >= maxFetches
-      ? `fetch budget of ${maxFetches} requests used up, so ${what}; call again with the same input to continue, since searches already made are cached`
-      : `time limit of ${Math.round(deadlineMs / 1000)} s reached, so ${what}; call again with the same input to continue, since searches already made are cached`;
+  const stopNote = (what: string): string => {
+    const again = "call again with the same input to continue, since searches already made are cached";
+    switch (budget.stopKind ?? "time") {
+      case "subrequests":
+        return `${limitReached(deps.subrequests.limit)}, so ${what}; call again with the same input to continue, since results so far are cached`;
+      case "fetches":
+        return `fetch budget of ${maxFetches} requests used up, so ${what}; ${again}`;
+      case "time":
+        return `time limit of ${Math.round(deadlineMs / 1000)} s reached, so ${what}; ${again}`;
+    }
+  };
   const failText = (f: FailedOutcome) => `${f.reason}: ${clip(f.detail, MAX_DETAIL_CHARS)}`;
 
   const now = deps.now();
@@ -66,58 +76,58 @@ export async function hackerNewsMentions(
   const count = input.years ?? DEFAULT_YEARS;
   const notes: string[] = [];
 
+  // A year's searches stop the counts at the first one the budget refused (limit) or that failed.
+  type Stop = { kind: "limit" } | { kind: "failed"; failure: FailedOutcome };
+  let stop: Stop | null = null;
   const years: Year[] = [];
-  let firstFailure: FailedOutcome | null = null;
-  let stopped = false;
   for (let y = thisYear - count + 1; y <= thisYear; y++) {
     if (budget.exhausted) {
-      stopped = true;
-      refused = true;
+      stop = { kind: "limit" };
       break;
     }
     const from = yearStart(y);
     const to = yearStart(y + 1);
-    const range = { fromTs: from, toTs: to };
-    const stories = await searchHn(gate, deps.cache, { query, tags: "story", hitsPerPage: SAMPLE_TITLES, ...range });
-    const comments = stories.ok ? await searchHn(gate, deps.cache, { query, tags: "comment", hitsPerPage: 0, ...range }) : stories;
-    const linking =
-      site && stories.ok && comments.ok
-        ? await searchHn(gate, deps.cache, { query: site, tags: "story", hitsPerPage: 0, urlOnly: true, ...range })
-        : null;
-    const failed = [stories, comments, linking].find((r) => r && !r.ok) as FailedOutcome | undefined;
-    if (failed) {
-      stopped = true;
-      if (!refused) firstFailure = failed;
-      else if (!firstFailure && failed.status !== REFUSED_STATUS) firstFailure = failed;
+    const before = refusals;
+    const r = await searchYear(gate, deps.cache, { query, site, fromTs: from, toTs: to, sampleTitles: SAMPLE_TITLES });
+    const refused = refusals > before;
+    if (!r.ok) {
+      stop = refused ? { kind: "limit" } : { kind: "failed", failure: r };
       break;
     }
-    if (!stories.ok || !comments.ok) break;
     years.push({
       year: y,
-      stories: stories.count,
-      comments: comments.count,
-      ...(linking && linking.ok ? { stories_linking_domain: linking.count } : {}),
-      sample_titles: stories.hits.map((h) => clip(h.title, MAX_TITLE_CHARS)),
+      stories: r.counts.stories.count,
+      comments: r.counts.comments,
+      ...(r.counts.linking === null ? {} : { stories_linking_domain: r.counts.linking }),
+      sample_titles: r.counts.stories.hits.map((h) => clip(h.title, MAX_TITLE_CHARS)),
       search_link: searchLink(query, from, to),
     });
+    if (r.linkingFailure) {
+      // Only the domain search failed: the year's counts stand, without the linking count.
+      const why = refused ? "was not made" : `failed (${failText(r.linkingFailure)})`;
+      notes.push(`the domain search for ${y} ${why}, so stories_linking_domain is missing for ${y}`);
+      stop = refused ? { kind: "limit" } : { kind: "failed", failure: r.linkingFailure };
+      break;
+    }
   }
 
-  if (stopped && years.length === 0 && firstFailure && !refused) {
-    return errorResult(firstFailure.reason, firstFailure.detail, tried, deps.now());
+  if (stop?.kind === "failed" && years.length === 0) {
+    return errorResult(stop.failure.reason, stop.failure.detail, tried, deps.now());
   }
 
-  if (stopped) {
+  if (stop) {
     const done = years.length ? `years ${years[0].year} to ${years[years.length - 1].year} are shown` : "no year was counted";
-    if (refused && !firstFailure) notes.push(stopNote(`the counts stop here (${done})`));
-    else if (firstFailure) notes.push(`a request failed (${failText(firstFailure)}), so the counts stop here (${done})`);
+    if (stop.kind === "limit") notes.push(stopNote(`the counts stop here (${done})`));
+    else notes.push(`a request failed (${failText(stop.failure)}), so the counts stop here (${done})`);
   }
   if (years.some((y) => y.year === thisYear)) notes.push(`${thisYear} is counted to date`);
 
   // Top threads: one search over all years, the most points first.
   let threads: Thread[] | undefined;
-  if (!stopped) {
+  if (!stop) {
     if (budget.exhausted) notes.push(stopNote("the top threads were not checked"));
     else {
+      const before = refusals;
       const r = await searchHn(gate, deps.cache, { query, tags: "story", hitsPerPage: THREAD_POOL });
       if (r.ok) {
         const ranked: HnHit[] = r.hits
@@ -132,12 +142,12 @@ export async function hackerNewsMentions(
           hn_link: `https://news.ycombinator.com/item?id=${h.id}`,
           story_link: h.url,
         }));
-      } else if (refused) notes.push(stopNote("the top threads were not checked"));
+      } else if (refusals > before) notes.push(stopNote("the top threads were not checked"));
       else notes.push(`the top threads could not be fetched (${failText(r)})`);
     }
   } else notes.push("the top threads were not checked");
 
-  const partial = stopped || threads === undefined;
+  const partial = stop !== null || threads === undefined;
   const assemble = (titles: number, threadCount: number): HnResult => ({
     status: partial ? "partial" : "ok",
     notes: titles < SAMPLE_TITLES || (threads && threadCount < threads.length) ? [...notes, "lists are shortened to fit the response size"] : notes,

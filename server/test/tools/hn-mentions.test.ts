@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { RESPONSE_CAP_CHARS } from "../../src/config";
 import { hnOutput, type HnInput, type HnResult } from "../../src/contract/tools";
-import { render, type ToolDeps } from "../../src/tools";
+import { callDeps, render, type ToolDeps } from "../../src/tools";
 import { hackerNewsMentions, renderHn } from "../../src/tools/hn-mentions";
+import { Subrequests } from "../../src/shared/subrequests";
 import { fakeFetch, type FakeFetch, type Route } from "../helpers/fake-fetch";
+import { meter } from "../helpers/meter";
 import fixture from "../fixtures/hn/search-hightouch.json";
 
 const NOW = Date.UTC(2026, 9, 20, 12); // 2026-10-20
@@ -49,6 +51,7 @@ async function deps(fetch: FakeFetch, now: () => number = () => NOW): Promise<To
     },
     cache: await caches.open(`hn-${crypto.randomUUID()}`),
     now,
+    subrequests: new Subrequests(45),
   };
 }
 
@@ -205,6 +208,19 @@ describe("hacker_news_mentions", () => {
     expect(lines).toContain("- A thread (9 points, 7 comments, 2024-05-06) https://news.ycombinator.com/item?id=7");
   });
 
+  it("keeps a year's counts when only its domain search fails, and says the domain count is missing", async () => {
+    const routes = { ...yearRoutes("Hightouch", [2025, 2026], "hightouch.com"), [threadsUrl("Hightouch")]: body(0) };
+    routes[linkingUrl("hightouch.com", 2026)] = { status: 503 };
+    const { result } = await call({ query: "Hightouch", domain: "hightouch.com", years: 2 }, routes);
+    expect(result.status).toBe("partial");
+    expect(result.years?.map((y) => [y.year, y.stories, y.comments, y.stories_linking_domain])).toEqual([
+      [2025, 25, 1025, 5],
+      [2026, 26, 1026, undefined],
+    ]);
+    expect(result.years?.[1]).not.toHaveProperty("stories_linking_domain");
+    expect(result.notes.join(" ")).toContain("so stories_linking_domain is missing for 2026");
+  });
+
   it("renders an error with the fallback line", () => {
     const text = renderHn({
       status: "error",
@@ -213,5 +229,56 @@ describe("hacker_news_mentions", () => {
       error: { reason: "bad_input", detail: "nope", tried: [], fallback: "fall back to browsing for this check." },
     });
     expect(text).toBe("hacker_news_mentions failed (bad_input): nope. fall back to browsing for this check.");
+  });
+});
+
+describe("hacker_news_mentions: subrequests on a cold cache", () => {
+  const span = (n: number) => Array.from({ length: n }, (_, i) => 2026 - n + 1 + i);
+
+  /** Deps as makeDeps builds them (a 45-subrequest counter), over a meter that counts what reaches the network and cache. */
+  async function metered(routes: Record<string, Route>, cache?: Cache) {
+    const m = meter(fakeFetch(routes), cache ?? (await caches.open(`hn-${crypto.randomUUID()}`)));
+    const noArchive = async () => {
+      throw new Error("hacker_news_mentions must not use the archive");
+    };
+    return { m, deps: callDeps({ fetch: m.fetch, cache: m.cache, archive: noArchive, now: () => NOW }, 45, "test") };
+  }
+
+  it("six years with a domain take 33: per year a read, three searches and a write, then the threads", async () => {
+    const { m, deps } = await metered({ ...yearRoutes("Hightouch", ALL, "hightouch.com"), [threadsUrl("Hightouch")]: body(0) });
+    const result = await hackerNewsMentions({ query: "Hightouch", domain: "hightouch.com" }, deps);
+    expect(result.status).toBe("ok");
+    expect(result.years?.map((y) => y.stories_linking_domain)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(m.total()).toBe(33);
+  });
+
+  it("ten years without a domain take 43", async () => {
+    const { m, deps } = await metered({ ...yearRoutes("Hightouch", span(10)), [threadsUrl("Hightouch")]: body(0) });
+    const result = await hackerNewsMentions({ query: "Hightouch", years: 10 }, deps);
+    expect(result.status).toBe("ok");
+    expect(result.years).toHaveLength(10);
+    expect(m.total()).toBe(43);
+  });
+
+  it("ten years with a domain stop at the limit of 45 with the years done, and say to call again", async () => {
+    const { m, deps } = await metered({ ...yearRoutes("Hightouch", span(10), "hightouch.com"), [threadsUrl("Hightouch")]: body(0) });
+    const result = await hackerNewsMentions({ query: "Hightouch", domain: "hightouch.com", years: 10 }, deps);
+    expect(m.total()).toBeLessThanOrEqual(45);
+    expect(result.status).toBe("partial");
+    expect(result.years?.map((y) => y.year)).toEqual(span(10).slice(0, 9));
+    const note = result.notes.find((n) => n.includes("per-request limit of 45 subrequests"));
+    expect(note).toContain("call again with the same input to continue");
+    expect(note).toContain("cached");
+    expect(result.notes.join(" ")).not.toMatch(/connection failed|599/);
+  });
+
+  it("a repeat call reads each year from one cache entry", async () => {
+    const cache = await caches.open(`hn-${crypto.randomUUID()}`);
+    const routes = { ...yearRoutes("Hightouch", ALL, "hightouch.com"), [threadsUrl("Hightouch")]: body(0) };
+    await hackerNewsMentions({ query: "Hightouch", domain: "hightouch.com" }, (await metered(routes, cache)).deps);
+    const again = await metered(routes, cache);
+    const result = await hackerNewsMentions({ query: "Hightouch", domain: "hightouch.com" }, again.deps);
+    expect(result.status).toBe("ok");
+    expect(again.m.counts).toEqual({ fetch: 0, cache: 7 }); // six years and the threads, one read each
   });
 });

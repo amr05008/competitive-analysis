@@ -1,13 +1,32 @@
 import { RENDER_MAX_CHARS } from "../config";
 import type { HnResult, JobOpeningsResult, PageHistoryResult, SecResult, ToolInputs, ToolName, ToolResult, ToolResults } from "../contract/tools";
+import { callCache } from "../shared/cache";
 import type { ArchiveFetch, Fetcher } from "../shared/http";
+import { countedFetch, Subrequests } from "../shared/subrequests";
 import { hackerNewsMentions, renderHn } from "./hn-mentions";
 import { jobOpenings, renderJobOpenings } from "./job-openings";
 import { pageHistory, renderPageHistory } from "./page-history";
 import { renderSec, secFilings } from "./sec-filings";
 
-/** What a tool may reach: every outbound request goes through these. */
-export type ToolDeps = { fetch: Fetcher; archive: ArchiveFetch; cache: Cache; now: () => number };
+/**
+ * What a tool may reach: every outbound request goes through these. `subrequests` counts this call's
+ * fetches and cache calls, so a tool can stop before the platform's per-request limit.
+ */
+export type ToolDeps = { fetch: Fetcher; archive: ArchiveFetch; cache: Cache; now: () => number; subrequests: Subrequests };
+
+/**
+ * One tool call's deps: `fetch` and `cache` counted against `limit` subrequests, and every cache key
+ * kept under `environment`. Every call's deps are built here, by makeDeps.
+ */
+export function callDeps(raw: Omit<ToolDeps, "subrequests">, limit: number, environment: string): ToolDeps {
+  const subrequests = new Subrequests(limit);
+  return {
+    ...raw,
+    fetch: countedFetch(raw.fetch, subrequests),
+    cache: callCache(raw.cache, environment, subrequests),
+    subrequests,
+  };
+}
 
 export type Implementation<K extends ToolName> = (input: ToolInputs[K], deps: ToolDeps) => Promise<ToolResults[K]>;
 

@@ -2,8 +2,9 @@ import { PAGE_HISTORY_DEADLINE_MS, PAGE_HISTORY_MAX_FETCHES, RESPONSE_CAP_CHARS,
 import { errorResult, utcDay } from "../contract/envelope";
 import type { PageHistoryInput, PageHistoryResult } from "../contract/tools";
 import { Budget } from "../shared/budget";
-import type { ArchiveFetch, FailedOutcome } from "../shared/http";
+import { REFUSED_STATUS, type ArchiveFetch, type FailedOutcome } from "../shared/http";
 import { normalizePageUrl } from "../shared/inputs";
+import { limitReached } from "../shared/subrequests";
 import { copyKey, type Fingerprint } from "../sources/fingerprint";
 import { CDX_LIMIT, captureLink, earliestCapture, fingerprintAt, listCaptures, type CaptureRow } from "../sources/wayback";
 import type { ToolDeps } from ".";
@@ -85,7 +86,7 @@ const captureFields = (ts: string, url: string): CaptureFields => ({
 // ------------------------------------------------------------------ search
 
 type Read = { fp: Fingerprint; key: string } | "unreadable";
-type Stop = { kind: "budget" } | { kind: "deadline" } | { kind: "refused"; failure: FailedOutcome };
+type Stop = { kind: "budget" } | { kind: "deadline" } | { kind: "subrequests" } | { kind: "refused"; failure: FailedOutcome };
 type Bracket = { i: number; j: number; resolved: boolean };
 type Search = {
   reads: (Read | undefined)[];
@@ -140,7 +141,6 @@ async function findChanges(
   cache: Cache,
   archive: ArchiveFetch,
   budget: Budget,
-  maxFetches: number,
   sampleSize: number,
 ): Promise<Search> {
   const n = captures.length;
@@ -150,8 +150,9 @@ async function findChanges(
   // Only uncached capture fetches reach this, so only they cost budget.
   const gated: ArchiveFetch = (u, o) => {
     if (budget.take()) return archive(u, o);
-    state.stop = { kind: budget.used >= maxFetches ? "budget" : "deadline" };
-    return Promise.resolve({ ok: false, reason: "server_busy", url: u, detail: "out of fetches or time" });
+    const why = budget.stopKind ?? "time";
+    state.stop = { kind: why === "subrequests" ? "subrequests" : why === "fetches" ? "budget" : "deadline" };
+    return Promise.resolve({ ok: false, reason: "server_busy", status: REFUSED_STATUS, url: u, detail: "out of fetches or time" });
   };
 
   const read = async (i: number): Promise<boolean> => {
@@ -248,9 +249,11 @@ function snapshot(c: CaptureRow, fp: Fingerprint, url: string, level: Level): Sn
   };
 }
 
-function stopNote(stop: Stop, maxFetches: number, deadlineMs: number): string {
+function stopNote(stop: Stop, maxFetches: number, deadlineMs: number, subrequestLimit: number): string {
   const resume = "call again with the same input to continue, since captures already read cost nothing";
   switch (stop.kind) {
+    case "subrequests":
+      return `${limitReached(subrequestLimit)}; call again with the same input to continue, since captures already read are cached`;
     case "budget":
       return `fetch budget of ${maxFetches} captures used up; ${resume}`;
     case "deadline":
@@ -284,8 +287,9 @@ export async function pageHistory(
   if (!range.ok) return errorResult("bad_input", range.detail, [], deps.now());
   const maxChanges = maxChangesOf(input.max_changes);
 
-  // The deadline counts from here. The budget gates capture fetches only.
-  const budget = new Budget(maxFetches, deadlineMs, deps.now);
+  // The deadline counts from here. The budget gates capture fetches only. Archive requests aren't
+  // subrequests of this call, but each capture read needs room for its cache write.
+  const budget = new Budget(maxFetches, deadlineMs, deps.now, { subrequests: deps.subrequests, reserve: 1 });
   let requests = 0;
   const archive: ArchiveFetch = (url, o) => {
     requests++;
@@ -318,10 +322,10 @@ export async function pageHistory(
   }
   if (!captures.length) notes.push(`no captures of this page between ${range.from} and ${range.to}`);
 
-  const search = await findChanges(captures, page.url, deps.cache, archive, budget, maxFetches, sampleSize);
+  const search = await findChanges(captures, page.url, deps.cache, archive, budget, sampleSize);
   const fpAt = (i: number) => (search.reads[i] as { fp: Fingerprint }).fp;
 
-  if (search.stop) notes.push(stopNote(search.stop, maxFetches, deadlineMs));
+  if (search.stop) notes.push(stopNote(search.stop, maxFetches, deadlineMs, deps.subrequests.limit));
   if (search.samplesRead < search.samplesTotal) {
     notes.push(
       search.samplesRead === 0

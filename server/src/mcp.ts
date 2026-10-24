@@ -6,26 +6,32 @@ import { errorResult, outputObject } from "./contract/envelope";
 import { TOOLS, type ToolName, type ToolResult } from "./contract/tools";
 import type { FetchOutcome } from "./shared/http";
 import { limitsStub } from "./shared/limits";
+import { parseSubrequestLimit } from "./shared/subrequests";
 import { outcomeOf } from "./shared/usage-store";
-import { IMPLEMENTATIONS, render, type ToolDeps } from "./tools";
+import { callDeps, IMPLEMENTATIONS, render, type ToolDeps } from "./tools";
 
+/** One tool call's deps, with its own subrequest counter (see callDeps). */
 export function makeDeps(env: Env): ToolDeps {
-  return {
-    // Wrapped, not passed bare: workerd throws "Illegal invocation" when fetch
-    // is called as a method of another object, as in deps.fetch(url).
-    fetch: (input, init) => fetch(input, init),
-    // Every archive request goes through the one server-wide gate. Like
-    // politeFetch, it never rejects: an unreachable gate is server_busy.
-    archive: async (url, opts): Promise<FetchOutcome> => {
-      try {
-        return await limitsStub(env).archiveFetch(url, opts);
-      } catch {
-        return { ok: false, reason: "server_busy", url, detail: "the archive gate is unavailable" };
-      }
+  return callDeps(
+    {
+      // Wrapped, not passed bare: workerd throws "Illegal invocation" when fetch
+      // is called as a method of another object, as in deps.fetch(url).
+      fetch: (input, init) => fetch(input, init),
+      // Every archive request goes through the one server-wide gate. Like
+      // politeFetch, it never rejects: an unreachable gate is server_busy.
+      archive: async (url, opts): Promise<FetchOutcome> => {
+        try {
+          return await limitsStub(env).archiveFetch(url, opts);
+        } catch {
+          return { ok: false, reason: "server_busy", url, detail: "the archive gate is unavailable" };
+        }
+      },
+      cache: caches.default,
+      now: () => Date.now(),
     },
-    cache: caches.default,
-    now: () => Date.now(),
-  };
+    parseSubrequestLimit(env.SUBREQUEST_LIMIT),
+    env.ENVIRONMENT,
+  );
 }
 
 /**

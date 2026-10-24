@@ -3,8 +3,9 @@ import { errorResult, utcDay } from "../contract/envelope";
 import type { ErrorReason } from "../contract/envelope";
 import type { Ats, JobOpeningsInput, JobOpeningsResult } from "../contract/tools";
 import { Budget } from "../shared/budget";
-import type { Fetcher } from "../shared/http";
+import { REFUSED_STATUS, type Fetcher } from "../shared/http";
 import { cleanCompanyName, normalizeDomain } from "../shared/inputs";
+import { limitReached } from "../shared/subrequests";
 import { fetchBoard, fetchRoleDetail, slugCandidates, type RawRole } from "../sources/boards";
 import { findBoardLink } from "../sources/careers";
 import type { ToolDeps } from ".";
@@ -17,8 +18,6 @@ const MAX_NAME_CHARS = 100;
 const MAX_TITLE_CHARS = 200;
 const MAX_LABEL_CHARS = 120;
 const MAX_DETAIL_CHARS = 200;
-/** What the gate answers with once the budget or clock has run out: a status no board sends, so a refusal is told from a real failure by a typed field. */
-const REFUSED_STATUS = 599;
 /** The longest role id echoed back in a note. */
 const MAX_ECHO_CHARS = 100;
 
@@ -60,24 +59,34 @@ export async function jobOpenings(
   const wanted = [...new Set((input.role_ids ?? []).map((id) => id.trim()).filter(Boolean))];
   const roleIds = wanted.slice(0, MAX_ROLE_IDS);
 
-  // The deadline counts from here. Every request goes through the gate.
-  const budget = new Budget(maxFetches, deadlineMs, deps.now);
+  // The deadline counts from here. Every request goes through the gate, with room for itself and a cache write.
+  const budget = new Budget(maxFetches, deadlineMs, deps.now, { subrequests: deps.subrequests, reserve: 2 });
   /** Every address checked, in order: each request the gate let through, and each board answered from the cache. */
   const tried: string[] = [];
   const refusedUrls = new Set<string>();
   const gate: Fetcher = (async (url: RequestInfo | URL, init?: RequestInit) => {
     if (budget.take()) {
       tried.push(String(url));
-      return deps.fetch(url, init);
+      const res = await deps.fetch(url, init);
+      // The subrequest counter below the gate declined it.
+      if (res.status === REFUSED_STATUS) refusedUrls.add(String(url));
+      return res;
     }
     refusedUrls.add(String(url));
     // The caller sees a failed request; the gate's own record says why.
     return new Response(null, { status: REFUSED_STATUS });
   }) as Fetcher;
-  const stopNote = (): string =>
-    budget.used >= maxFetches
-      ? `fetch budget of ${maxFetches} requests used up, so some boards and pages were not checked; call again with the same input to continue, since boards already read are cached`
-      : `time limit of ${Math.round(deadlineMs / 1000)} s reached, so some boards and pages were not checked; call again with the same input to continue, since boards already read are cached`;
+  const stopNote = (): string => {
+    const rest = "so some boards and pages were not checked; call again with the same input to continue, since boards already read are cached";
+    switch (budget.stopKind ?? "time") {
+      case "subrequests":
+        return `${limitReached(deps.subrequests.limit)}, ${rest}`;
+      case "fetches":
+        return `fetch budget of ${maxFetches} requests used up, ${rest}`;
+      case "time":
+        return `time limit of ${Math.round(deadlineMs / 1000)} s reached, ${rest}`;
+    }
+  };
 
   const notes: string[] = [];
   if (wanted.length > MAX_ROLE_IDS) notes.push(`only the first ${MAX_ROLE_IDS} role_ids were used`);

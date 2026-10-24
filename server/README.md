@@ -60,6 +60,11 @@ instead.
 
 - After editing `wrangler.toml`, run `npx wrangler types` and commit
   `worker-configuration.d.ts`.
+- `SUBREQUEST_LIMIT` (45) caps each tool call's fetches plus Cache API calls. The free plan
+  counts both against one limit of 50 per request, and a tool that reaches 45 returns what it
+  has as partial, with a note to call again. On the paid plan, raise it to about 900.
+- Cache keys start with the environment's name and a version per source, since staging and
+  production share one zone's cache. Bump a source's version when its cached shape changes.
 - The compatibility date (2026-08-15) is the newest the test pool's bundled workerd supports,
   so tests and production run the same runtime flags. Raise it when the pool catches up.
 - Output values from sets that may grow (error reasons, job board services) are plain strings

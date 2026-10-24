@@ -3,9 +3,11 @@ import { z } from "zod";
 import { MAX_ROLES, RESPONSE_CAP_CHARS, ROLE_DESCRIPTION_MAX_CHARS } from "../../src/config";
 import { FALLBACK_LINE } from "../../src/contract/envelope";
 import { jobOpeningsOutput, type JobOpeningsInput, type JobOpeningsResult } from "../../src/contract/tools";
-import { render, type ToolDeps } from "../../src/tools";
+import { callDeps, render, type ToolDeps } from "../../src/tools";
 import { jobOpenings, renderJobOpenings } from "../../src/tools/job-openings";
+import { Subrequests } from "../../src/shared/subrequests";
 import { fakeFetch, type FakeFetch, type Route } from "../helpers/fake-fetch";
+import { meter } from "../helpers/meter";
 import careersAshby from "../fixtures/boards/careers-ashby-link.html?raw";
 import ghDepartments from "../fixtures/boards/greenhouse-stripe-departments.json";
 import ghDetail from "../fixtures/boards/greenhouse-stripe-job-detail.json";
@@ -46,6 +48,7 @@ function depsFor(fetch: FakeFetch, opts: { now?: () => number; cache?: Cache } =
     // A fresh cache per test, so no test reads another's boards.
     cache: opts.cache ?? (await caches.open(`jobs-${crypto.randomUUID()}`)),
     now: opts.now ?? (() => NOW),
+    subrequests: new Subrequests(45),
   }))();
 }
 
@@ -381,5 +384,60 @@ describe("job_openings: rendering", () => {
     const ids = [0, 1, 2, 3, 4].map((i) => `role-${i}`);
     const big = await call({ domain: "acme.io", role_ids: ids }, { [ashbyApi("acme")]: JSON.stringify(ashbyBoard(5, { description: "y".repeat(3000) })) });
     expect(render("job_openings", big.result).length).toBeLessThanOrEqual(4000);
+  });
+});
+
+describe("job_openings: subrequests on a cold cache", () => {
+  const ids = ghJobs.jobs.slice(0, 5).map((j) => String(j.id));
+  const detailUrl = (slug: string, id: string) => `https://boards-api.greenhouse.io/v1/boards/${slug}/jobs/${id}?pay_transparency=true`;
+
+  /** Deps as makeDeps builds them (`limit` subrequests), over a meter that counts what reaches the network and cache. */
+  async function metered(routes: Record<string, Route>, limit = 45) {
+    const m = meter(fakeFetch(routes), await caches.open(`jobs-${crypto.randomUUID()}`));
+    const noArchive = async () => {
+      throw new Error("job_openings must not use the archive");
+    };
+    return { m, deps: callDeps({ fetch: m.fetch, cache: m.cache, archive: noArchive, now: () => NOW }, limit, "test") };
+  }
+
+  /** Nine absent boards, three empty careers pages, a fourth linking a Greenhouse board, and five role details. */
+  function worstPath(): Record<string, Route> {
+    const routes: Record<string, Route> = {
+      [careers("acme.io")[3]]: '<a href="https://boards.greenhouse.io/acmehq">Jobs</a>',
+      [gh("acmehq")]: JSON.stringify(ghJobs),
+      [ghDeps("acmehq")]: JSON.stringify(ghDepartments),
+    };
+    for (const id of ids) routes[detailUrl("acmehq", id)] = JSON.stringify({ ...ghDetail, id: Number(id) });
+    return routes;
+  }
+
+  it("a big Greenhouse board with five role descriptions takes 9", async () => {
+    const routes: Record<string, Route> = { [gh("stripe")]: JSON.stringify(ghJobs), [ghDeps("stripe")]: JSON.stringify(ghDepartments) };
+    for (const id of ids) routes[detailUrl("stripe", id)] = JSON.stringify({ ...ghDetail, id: Number(id) });
+    const { m, deps } = await metered(routes);
+    const result = await jobOpenings({ domain: "stripe.com", company_name: "Stripe", role_ids: ids }, deps);
+    expect(result.status).toBe("ok");
+    expect(result.roles).toHaveLength(5);
+    expect(m.total()).toBe(9);
+  });
+
+  it("the longest path, every board tried and found through the careers page, takes 40", async () => {
+    const { m, deps } = await metered(worstPath());
+    const result = await jobOpenings({ domain: "acme.io", company_name: "Acme Labs", role_ids: ids }, deps);
+    expect(result.status).toBe("ok");
+    expect(result.board?.slug).toBe("acmehq");
+    expect(result.roles?.every((r) => r.description)).toBe(true);
+    expect(m.counts).toEqual({ fetch: 20, cache: 20 });
+  });
+
+  it("at a lower limit it stops before the limit with partial, and says to call again", async () => {
+    const { m, deps } = await metered(worstPath(), 12);
+    const result = await jobOpenings({ domain: "acme.io", company_name: "Acme Labs", role_ids: ids }, deps);
+    expect(m.total()).toBeLessThanOrEqual(12);
+    expect(result.status).toBe("partial");
+    expect(result.no_public_board_found).toBe(false);
+    const note = result.notes.find((n) => n.includes("per-request limit of 12 subrequests"));
+    expect(note).toContain("call again with the same input to continue");
+    expect(JSON.stringify(result)).not.toMatch(/HTTP 599|connection failed/);
   });
 });

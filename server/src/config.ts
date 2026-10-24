@@ -34,6 +34,12 @@ export const PAGE_HISTORY_MAX_FETCHES = 30;
  * capture can still take a gate wait (up to 1 s) and a slow archive answer (about 5 s), and the call targets 30 s.
  */
 export const PAGE_HISTORY_DEADLINE_MS = 22_000;
+/**
+ * The subrequests (every fetch() and every Cache API call) one tool call may make when SUBREQUEST_LIMIT
+ * isn't a usable number. The free plan allows 50 per request; the other 5 leave room for the self-check's
+ * Discord posts. Raise SUBREQUEST_LIMIT to about 900 on the paid plan.
+ */
+export const DEFAULT_SUBREQUEST_LIMIT = 45;
 /** The most characters of JSON in one tool result. */
 export const RESPONSE_CAP_CHARS = 20_000;
 /** The most characters in one tool result's text rendering; the structured result carries the rest. */

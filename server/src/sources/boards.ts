@@ -124,6 +124,8 @@ function greenhousePay(ranges: unknown): string | null {
 // ------------------------------------------------------------------- fetch
 
 const GH_API = "https://boards-api.greenhouse.io/v1/boards";
+/** Starts every cache key; bump the version when a cached shape changes, so old entries are never read. */
+const KEY = "boards:v1";
 
 function apiUrl(ats: Ats, slug: string): string {
   const s = encodeURIComponent(slug);
@@ -278,7 +280,7 @@ async function readBoard(fetcher: Fetcher, ats: Ats, slug: string): Promise<Boar
  */
 export async function fetchBoard(fetcher: Fetcher, cache: Cache, ats: Ats, slug: string): Promise<Board> {
   let failure: Board | null = null;
-  const { value } = await cached<Board>(cache, `board:${ats}:${slug}`, TTL_BOARD, async () => {
+  const { value } = await cached<Board>(cache, `${KEY}:${ats}:${slug}`, TTL_BOARD, async () => {
     const b = await readBoard(fetcher, ats, slug);
     if (b.kind === "error" || (b.kind === "found" && b.departmentsError)) {
       failure = b;

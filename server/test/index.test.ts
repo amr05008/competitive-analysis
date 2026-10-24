@@ -3,8 +3,8 @@ import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { errorResult } from "../src/contract/envelope";
 import type { JobOpeningsResult } from "../src/contract/tools";
-import { runTool } from "../src/mcp";
-import { IMPLEMENTATIONS } from "../src/tools";
+import { makeDeps, runTool } from "../src/mcp";
+import { IMPLEMENTATIONS, type ToolDeps } from "../src/tools";
 import { rpc } from "./helpers/mcp";
 
 // Durable Object storage is fresh for each test file but shared by the tests
@@ -171,6 +171,30 @@ describe("runTool", () => {
     });
     expect(tool).not.toHaveBeenCalled();
     expect(calls.record).toEqual([]);
+  });
+
+  it("each call gets its own subrequest counter, set from SUBREQUEST_LIMIT", async () => {
+    const seen: ToolDeps[] = [];
+    tool.mockImplementation(async (_input: unknown, deps: ToolDeps) => {
+      seen.push(deps);
+      return PARTIAL;
+    });
+    const { env: e } = withLimits({});
+    await runTool("job_openings", INPUT, e, createExecutionContext(), { selfCheck: false });
+    await runTool("job_openings", INPUT, { ...e, SUBREQUEST_LIMIT: "900" } as unknown as Env, createExecutionContext(), { selfCheck: false });
+    await runTool("job_openings", INPUT, { ...e, SUBREQUEST_LIMIT: "lots" } as unknown as Env, createExecutionContext(), { selfCheck: false });
+    expect(seen.map((d) => d.subrequests.limit)).toEqual([45, 900, 45]);
+    expect(new Set(seen.map((d) => d.subrequests)).size).toBe(3);
+  });
+
+  it("makeDeps counts fetches and cache calls, and past the limit refuses without a request", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response("ok"));
+    const deps = makeDeps({ ...env, SUBREQUEST_LIMIT: "2" } as unknown as Env);
+    await deps.cache.match("https://cache.competitive-analysis.invalid/k");
+    expect((await deps.fetch("https://example.com/")).status).toBe(200);
+    expect((await deps.fetch("https://example.com/")).status).toBe(599);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(deps.subrequests.used).toBe(2);
   });
 
   it("an unreachable Limits object fails closed with server_busy", async () => {

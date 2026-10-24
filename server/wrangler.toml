@@ -16,6 +16,9 @@ enabled = false
 [vars]
 ENVIRONMENT = "dev"
 DAILY_TOOL_CALL_CAP = "200"
+# Fetches plus Cache API calls per tool call. The free plan allows 50 per
+# request; raise this to about 900 on the paid plan.
+SUBREQUEST_LIMIT = "45"
 
 # One global instance (idFromName("global")): the archive gate, the daily call
 # cap and anonymous usage counts.

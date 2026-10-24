@@ -59,6 +59,13 @@ describe("searchHn", () => {
     expect(fetch.calls).toHaveLength(1);
   });
 
+  it("caches under a key that carries the adapter and its version", async () => {
+    const cache = await fresh();
+    const url = "https://hn.algolia.com/api/v1/search?query=%22Hightouch%22&tags=story&hitsPerPage=5";
+    await searchHn(fakeFetch({ [url]: JSON.stringify(fixture) }), cache, { query: "Hightouch", tags: "story", hitsPerPage: 5 });
+    expect(await cache.match(`https://cache.competitive-analysis.invalid/${encodeURIComponent(`hn:v1:search:${url}`)}`)).toBeDefined();
+  });
+
   it("returns a failure as a value", async () => {
     const fetch = fakeFetch({
       "https://hn.algolia.com/api/v1/search?query=%22X%22&tags=story&hitsPerPage=5": { status: 429 },

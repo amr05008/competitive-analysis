@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { RESPONSE_CAP_CHARS } from "../../src/config";
 import { secOutput, type SecInput, type SecResult } from "../../src/contract/tools";
-import { render, type ToolDeps } from "../../src/tools";
+import { callDeps, render, type ToolDeps } from "../../src/tools";
 import { renderSec, secFilings } from "../../src/tools/sec-filings";
+import { Subrequests } from "../../src/shared/subrequests";
 import { fakeFetch, type FakeFetch, type Route } from "../helpers/fake-fetch";
+import { meter } from "../helpers/meter";
 import searchStripe from "../fixtures/edgar/search-stripe.json";
 import searchEmpty from "../fixtures/edgar/search-hightouch-empty.json";
 import subStripe from "../fixtures/edgar/submissions-stripe.json";
@@ -62,6 +64,7 @@ async function deps(fetch: FakeFetch, now: () => number = () => NOW): Promise<To
     },
     cache: await caches.open(`sec-${crypto.randomUUID()}`),
     now,
+    subrequests: new Subrequests(45),
   };
 }
 
@@ -442,5 +445,44 @@ describe("renderSec", () => {
     expect(renderSec(result)).toContain("no filings found under these names: Hightouch");
     const bad = await call({ company_name: "Example", domain: "127.0.0.1" }, {});
     expect(renderSec(bad.result)).toMatch(/^sec_filings failed \(bad_input\)/);
+  });
+});
+
+describe("sec_filings: subrequests on a cold cache", () => {
+  /** Deps as makeDeps builds them (a 45-subrequest counter), over a meter that counts what reaches the network and cache. */
+  async function metered(routes: Record<string, Route>) {
+    const m = meter(fakeFetch(routes), await caches.open(`sec-${crypto.randomUUID()}`));
+    const noArchive = async () => {
+      throw new Error("sec_filings must not use the archive");
+    };
+    return { m, deps: callDeps({ fetch: m.fetch, cache: m.cache, archive: noArchive, now: () => NOW }, 45, "test") };
+  }
+
+  it("Stripe takes 42: the search, eight submissions and five Form Ds, each a read, a fetch and a write", async () => {
+    const { m, deps } = await metered(stripeRoutes());
+    const result = await secFilings({ company_name: "Stripe", domain: "stripe.com" }, deps, { sleep: async () => {} });
+    expect(result.status).toBe("ok");
+    expect(result.entities?.[0].form_d).toHaveLength(5);
+    expect(m.total()).toBe(42);
+  });
+
+  it("two names and five companies with Form Ds stop at the limit of 45, and say to call again", async () => {
+    const hits = (prefix: string, base: number) => Array.from({ length: 5 }, (_, i) => [String(base + i), `${prefix} ${i}`] as [string, string]);
+    const first = hits("Big", 800);
+    const second = hits("Bigco", 900);
+    const routes: Record<string, Route> = { [`${SEARCH}Big`]: searchBody(first), [`${SEARCH}bigco`]: searchBody(second) };
+    for (const [cik, name] of [...first, ...second]) {
+      routes[subUrl(cik)] = makeSub(name, cik, {}, ["D", "D", "D", "D", "D"]);
+      for (let i = 1; i <= 5; i++) routes[formDUrl(cik, `${cik.padStart(10, "0")}-24-${String(i).padStart(6, "0")}`)] = formDStripe;
+    }
+    const { m, deps } = await metered(routes);
+    const result = await secFilings({ company_name: "Big", domain: "bigco.com" }, deps, { sleep: async () => {} });
+    expect(m.total()).toBeLessThanOrEqual(45);
+    expect(result.status).toBe("partial");
+    expect(result.entities).toHaveLength(5);
+    const note = result.notes.find((n) => n.includes("per-request limit of 45 subrequests"));
+    expect(note).toMatch(/Form D notices were not read/);
+    expect(note).toContain("call again with the same input to continue");
+    expect(JSON.stringify(result)).not.toMatch(/HTTP 599|connection failed/);
   });
 });

@@ -12,7 +12,7 @@ const SUB = "https://data.sec.gov/submissions/CIK0001691342.json";
 const FORM_D = "https://www.sec.gov/Archives/edgar/data/1691342/000169134224000001/primary_doc.xml";
 const CACHE_BASE = "https://cache.competitive-analysis.invalid/";
 const seed = (cache: Cache, url: string, value: unknown) =>
-  cache.put(new Request(CACHE_BASE + encodeURIComponent(`v2:${url}`)), new Response(JSON.stringify(value), { headers: { "cache-control": "max-age=600" } }));
+  cache.put(new Request(CACHE_BASE + encodeURIComponent(`edgar:v2:${url}`)), new Response(JSON.stringify(value), { headers: { "cache-control": "max-age=600" } }));
 const fresh = () => caches.open(`edgar-${crypto.randomUUID()}`);
 
 const sub = (over: Partial<Submissions>): Submissions => ({
@@ -48,7 +48,7 @@ describe("searchEntities", () => {
     const second = await searchEntities(f, cache, "stripe");
     expect(f.calls).toHaveLength(1);
     expect(second).toEqual(first);
-    const entry = await cache.match(new Request(CACHE_BASE + encodeURIComponent(`v2:${SEARCH}stripe`)));
+    const entry = await cache.match(new Request(CACHE_BASE + encodeURIComponent(`edgar:v2:${SEARCH}stripe`)));
     expect(entry).toBeTruthy();
     expect(await (entry as Response).text()).not.toMatch(/Stripe|LLC|LP/);
   });
@@ -80,7 +80,7 @@ describe("getSubmissions", () => {
     const cache = await fresh();
     const r = await getSubmissions(f, cache, "9999999");
     expect(r).toEqual({ ok: true, sub: null });
-    const entry = await cache.match(new Request(CACHE_BASE + encodeURIComponent(`v2:${url}`)));
+    const entry = await cache.match(new Request(CACHE_BASE + encodeURIComponent(`edgar:v2:${url}`)));
     const raw = await (entry as Response).text();
     expect(raw).toBe('{"listable":false}');
     expect(raw).not.toMatch(/Person|"4"|0009999999/);

@@ -29,8 +29,8 @@ const INDUSTRY_BY_KEY = new Map(INDUSTRY_GROUPS.map((g) => [industryKey(g), g]))
 /** The most recent filings kept per company, besides every Form D. */
 const KEEP_FILINGS = 100;
 const MAX_HITS = 10;
-/** Part of every cache key; bump it when a cached shape or a rule changes so old entries are never read. */
-export const CACHE_VERSION = "v2";
+/** Starts every cache key; bump the version when a cached shape or a rule changes, so old entries are never read. */
+const KEY = "edgar:v2";
 const MAX_NAME_CHARS = 200;
 
 export type Filing = { form: string; date: string; accession: string };
@@ -84,7 +84,7 @@ async function fetchParsed<T>(
   what: string,
 ): Promise<({ ok: true; value: T }) | FailedOutcome> {
   let failure: FailedOutcome | null = null;
-  const { value } = await cached<T>(cache, `${CACHE_VERSION}:${url}`, TTL_EDGAR, async () => {
+  const { value } = await cached<T>(cache, `${KEY}:${url}`, TTL_EDGAR, async () => {
     const r = await politeFetch(fetcher, url, { maxBytes });
     if (!r.ok) {
       failure = r;

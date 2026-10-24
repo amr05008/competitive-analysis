@@ -4,9 +4,12 @@ import { errorResult } from "../../src/contract/envelope";
 import { pageHistoryOutput, type PageHistoryInput, type PageHistoryResult } from "../../src/contract/tools";
 import type { ArchiveFetch } from "../../src/shared/http";
 import type { CaptureRow } from "../../src/sources/wayback";
-import { MORE_LINE, render, type ToolDeps } from "../../src/tools";
+import { callDeps, MORE_LINE, render, type ToolDeps } from "../../src/tools";
 import { pageHistory, renderPageHistory } from "../../src/tools/page-history";
+import { Subrequests } from "../../src/shared/subrequests";
 import { fakeArchive, type FakeArchive } from "../helpers/fake-archive";
+import { fakeFetch } from "../helpers/fake-fetch";
+import { meter } from "../helpers/meter";
 
 const NOW = Date.UTC(2026, 9, 20, 12); // 2026-10-20
 const PAGE = "https://example.com/pricing";
@@ -38,6 +41,7 @@ async function depsFor(archive: ArchiveFetch, opts: { cache?: Cache; now?: () =>
     // A fresh cache per test, so no test reads another's fingerprints.
     cache: opts.cache ?? (await caches.open(`page-history-${crypto.randomUUID()}`)),
     now: opts.now ?? (() => NOW),
+    subrequests: new Subrequests(45),
   };
 }
 
@@ -527,5 +531,36 @@ describe("page_history: output", () => {
     const text = renderPageHistory(errorResult("bad_input", "IP addresses are not accepted", [], NOW));
     expect(text).toContain("bad_input");
     expect(text).toContain("fall back to browsing for this check.");
+  });
+});
+
+describe("page_history: subrequests on a cold cache", () => {
+  it("31 captures, each a different copy, stop at the limit of 45 cache calls with partial, and say to call again", async () => {
+    // Archive requests go to the Limits object and count against its own requests; only cache calls count here.
+    const m = meter(fakeFetch({}), await caches.open(`page-history-${crypto.randomUUID()}`));
+    const fake = fakeArchive(copies((i) => `Copy ${i}`, 31));
+    const deps = callDeps({ fetch: m.fetch, archive: fake, cache: m.cache, now: () => NOW }, 45, "test");
+    const r = await pageHistory(JAN, deps);
+    expect(schema.safeParse(r).error).toBeUndefined();
+    expect(m.counts.fetch).toBe(0);
+    expect(m.total()).toBeLessThanOrEqual(45);
+    expect(r.status).toBe("partial");
+    // Two index queries, the 16 samples and 4 bisection reads: a read and a write each.
+    expect(fake.calls).toHaveLength(2 + 20);
+    const note = r.notes.find((n) => n.includes("per-request limit of 45 subrequests"));
+    expect(note).toContain("call again with the same input to continue");
+    expect(r.notes.join(" ")).not.toContain("archive refused");
+  });
+
+  it("a repeat call reads what the first one cached and goes further", async () => {
+    const cache = await caches.open(`page-history-${crypto.randomUUID()}`);
+    const data = copies((i) => `Copy ${i}`, 31);
+    const first = fakeArchive(data);
+    await pageHistory(JAN, callDeps({ fetch: fakeFetch({}), archive: first, cache, now: () => NOW }, 45, "test"));
+    const again = fakeArchive(data);
+    const r = await pageHistory(JAN, callDeps({ fetch: fakeFetch({}), archive: again, cache, now: () => NOW }, 45, "test"));
+    expect(again.calls.length).toBeGreaterThan(0);
+    expect(again.calls.every((u) => !u.includes("/cdx/"))).toBe(true);
+    expect(r.changes!.filter((c) => c.resolved).length).toBeGreaterThan(4);
   });
 });

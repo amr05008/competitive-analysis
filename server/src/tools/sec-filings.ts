@@ -2,8 +2,9 @@ import { EDGAR_GAP_MS, MAX_ENTITIES, MAX_FILINGS, MAX_FORM_D, RESPONSE_CAP_CHARS
 import { errorResult, utcDay } from "../contract/envelope";
 import type { SecInput, SecResult } from "../contract/tools";
 import { Budget } from "../shared/budget";
-import type { FailedOutcome, Fetcher } from "../shared/http";
+import { REFUSED_STATUS, type FailedOutcome, type Fetcher } from "../shared/http";
 import { cleanCompanyName, normalizeDomain } from "../shared/inputs";
+import { limitReached } from "../shared/subrequests";
 import {
   filingFolder,
   getFormD,
@@ -20,8 +21,6 @@ type FormDEntry = Entity["form_d"][number];
 /** How many search hits have their submissions read. */
 const MAX_CANDIDATES = 8;
 const MAX_DETAIL_CHARS = 200;
-/** What the gate answers with once the budget or clock has run out: a status no EDGAR page sends. */
-const REFUSED_STATUS = 599;
 
 const clip = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -54,7 +53,8 @@ export async function secFilings(
   if (label && label.length >= 2 && label.replace(/[^a-z0-9]/g, "") !== normalizeEntityName(name).replace(/ /g, "")) namesTried.push(label);
   const wanted = new Set(namesTried.map(normalizeEntityName));
 
-  const budget = new Budget(maxFetches, deadlineMs, deps.now);
+  // Each request needs room for itself and its cache write.
+  const budget = new Budget(maxFetches, deadlineMs, deps.now, { subrequests: deps.subrequests, reserve: 2 });
   const tried: string[] = [];
   let lastStart: number | null = null;
   let rateLimited = false;
@@ -74,12 +74,17 @@ export async function secFilings(
     return res;
   }) as Fetcher;
   const halted = () => rateLimited || budget.exhausted;
-  const stopReason = (): string =>
-    rateLimited
-      ? "EDGAR rate-limited the request"
-      : budget.used >= maxFetches
-      ? `fetch budget of ${maxFetches} requests used up`
-      : `time limit of ${Math.round(deadlineMs / 1000)} s reached`;
+  const stopReason = (): string => {
+    if (rateLimited) return "EDGAR rate-limited the request";
+    switch (budget.stopKind ?? "time") {
+      case "subrequests":
+        return limitReached(deps.subrequests.limit);
+      case "fetches":
+        return `fetch budget of ${maxFetches} requests used up`;
+      case "time":
+        return `time limit of ${Math.round(deadlineMs / 1000)} s reached`;
+    }
+  };
   const advice = () =>
     rateLimited
       ? "wait a few minutes before calling again"

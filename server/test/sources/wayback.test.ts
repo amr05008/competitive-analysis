@@ -106,3 +106,17 @@ describe("fingerprintAt", () => {
     expect(await fingerprintAt(archive, caches.default, "2025", "https://a.com/x")).toBe(failed);
   });
 });
+
+describe("cache keys", () => {
+  const key = (k: string) => `https://cache.competitive-analysis.invalid/${encodeURIComponent(k)}`;
+
+  it("carry the adapter and its version", async () => {
+    const cache = await caches.open(`wayback-${crypto.randomUUID()}`);
+    const page = `https://hightouch.com/pricing?${crypto.randomUUID()}`;
+    await fingerprintAt(fake(capture).archive, cache, "20250114231348", page);
+    expect(await cache.match(key(`wayback:v1:fp:https://web.archive.org/web/20250114231348id_/${page}`))).toBeDefined();
+    const { archive, calls } = fake("[]");
+    await earliestCapture(archive, cache, "hightouch.com/pricing");
+    expect(await cache.match(key(`wayback:v1:cdx:${calls[0].url}`))).toBeDefined();
+  });
+});
