@@ -39,6 +39,34 @@ describe("tools/list", () => {
     for (const tool of list.tools) expect(tool.outputSchema?.type, tool.name).toBe("object");
   });
 
+  it("caps every text input", async () => {
+    const list: ToolListJson = await rpc("tools/list");
+    const prop = (tool: string, key: string) => list.tools.find((t) => t.name === tool)!.inputSchema.properties![key]!;
+    expect(prop("page_history", "url").maxLength).toBe(2000);
+    expect(prop("job_openings", "domain").maxLength).toBe(253);
+    expect(prop("job_openings", "company_name").maxLength).toBe(120);
+    expect(prop("job_openings", "role_ids").items!.maxLength).toBe(64);
+    expect(prop("hacker_news_mentions", "query").maxLength).toBe(80);
+    expect(prop("hacker_news_mentions", "domain").maxLength).toBe(253);
+    expect(prop("sec_filings", "company_name").maxLength).toBe(120);
+    expect(prop("sec_filings", "domain").maxLength).toBe(253);
+  });
+
+  // Each input is also one the tool refuses before any fetch (a private host, or a page address over
+  // 500 characters), so a missing schema cap fails this test without reaching a live source.
+  it.each([
+    ["job_openings", { domain: "127.0.0.1", company_name: "x".repeat(20_000) }],
+    ["sec_filings", { company_name: "x".repeat(20_000), domain: "127.0.0.1" }],
+    ["page_history", { url: `https://example.com/${"a".repeat(20_000)}` }],
+    ["job_openings", { domain: "127.0.0.1", role_ids: ["1".repeat(65)] }],
+    ["hacker_news_mentions", { query: "Example", domain: `127.0.0.${"1".repeat(250)}` }],
+  ])("the schema refuses an over-long %s input before the tool runs", async (name, args) => {
+    const result = await rpc("tools/call", { name, arguments: args });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/Input validation error/);
+    expect(result.structuredContent).toBeUndefined();
+  });
+
   it("the tool list matches the committed snapshot", async () => {
     const list: ToolListJson = await rpc("tools/list");
     await expect(JSON.stringify(list, null, 2)).toMatchFileSnapshot(SNAPSHOT);
@@ -214,6 +242,32 @@ describe("assertAdditive", () => {
       const was = withOutput({ type: "string", enum: ["ok", "partial", "error"] });
       const now = withOutput({ type: "string", enum: ["ok", "error"] });
       expect(check(was, now)).not.toThrow();
+    });
+
+    it.each(["pattern", "format"])("changing or dropping an output %s throws, and adding one passes", (key) => {
+      const was = withOutput({ type: "string", [key]: "^\\d{4}$" });
+      expect(check(was, withOutput({ type: "string", [key]: "^\\d+$" }))).toThrow(new RegExp(`changed the ${key} of output kind`));
+      expect(check(was, withOutput({ type: "string" }))).toThrow(new RegExp(`dropped the ${key} of output kind`));
+      expect(check(withOutput({ type: "string" }), was)).not.toThrow();
+    });
+
+    it.each<[string, JsonSchema, JsonSchema]>([
+      ["minimum", { type: "integer", minimum: 0 }, { type: "integer", minimum: -1 }],
+      ["maximum", { type: "integer", maximum: 15 }, { type: "integer", maximum: 20 }],
+      ["minLength", { type: "string", minLength: 2 }, { type: "string", minLength: 1 }],
+      ["maxLength", { type: "string", maxLength: 80 }, { type: "string", maxLength: 81 }],
+      ["minItems", { type: "array", items: { type: "string" }, minItems: 1 }, { type: "array", items: { type: "string" }, minItems: 0 }],
+      ["maxItems", { type: "array", items: { type: "string" }, maxItems: 5 }, { type: "array", items: { type: "string" }, maxItems: 6 }],
+    ])("loosening or dropping an output's %s throws", (key, was, now) => {
+      expect(check(withOutput(was), withOutput(now))).toThrow(new RegExp(`loosened ${key} of output kind`));
+      const { [key]: _dropped, ...without } = was;
+      expect(check(withOutput(was), withOutput(without as JsonSchema))).toThrow(new RegExp(`loosened ${key} of output kind`));
+    });
+
+    it("tightening output bounds passes", () => {
+      const was = withOutput({ type: "string", minLength: 1, maxLength: 80 });
+      expect(check(was, withOutput({ type: "string", minLength: 2, maxLength: 40 }))).not.toThrow();
+      expect(check(withOutput({ type: "integer" }), withOutput({ type: "integer", minimum: 0 }))).not.toThrow();
     });
 
     it("closing an output to extra properties throws", () => {

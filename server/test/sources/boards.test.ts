@@ -336,6 +336,17 @@ describe("findBoardLink", () => {
     expect((await findBoardLink(fakeFetch({ [PAGES[0]]: html }), "acme.io")).found).toEqual(expected);
   });
 
+  it("reads a crafted 512 KB careers page in under 100 ms", async () => {
+    const junk = `boards.greenhouse.io/embed/job_board?${"a&".repeat(200)}`;
+    const link = '<iframe src="https://boards.greenhouse.io/embed/job_board?for=acme"></iframe>';
+    const page = junk.repeat(Math.floor((CAREERS_MAX_BYTES - link.length) / junk.length)) + link;
+    expect(page.length).toBeGreaterThan(500_000);
+    const start = performance.now();
+    const r = await findBoardLink(fakeFetch({ [PAGES[0]]: page }), "acme.io");
+    expect(performance.now() - start).toBeLessThan(100);
+    expect(r.found).toEqual({ ats: "greenhouse", slug: "acme" });
+  });
+
   it("reports a refused careers page as a failure, not absence", async () => {
     const r = await findBoardLink(fakeFetch({ [PAGES[0]]: { status: 403 } }), "acme.io");
     expect(r.found).toBeNull();

@@ -10,10 +10,11 @@
         "properties": {
           "url": {
             "type": "string",
+            "maxLength": 2000,
             "description": "The company page to check, such as https://example.com/pricing."
           },
           "from": {
-            "description": "The first month to search, as YYYY-MM; defaults to 24 months before to.",
+            "description": "The first month to search, as YYYY-MM. Defaults to 24 months before the last month; the earliest is 1996-01.",
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}$"
           },
@@ -311,18 +312,21 @@
         "properties": {
           "domain": {
             "type": "string",
+            "maxLength": 253,
             "description": "The company's website domain, such as example.com."
           },
           "company_name": {
             "description": "The company's name, used to find its board when the name differs from the domain.",
-            "type": "string"
+            "type": "string",
+            "maxLength": 120
           },
           "role_ids": {
             "description": "Up to five role ids from an earlier call, to get those roles' full descriptions.",
             "maxItems": 5,
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 64
             }
           }
         },
@@ -602,7 +606,8 @@
           },
           "domain": {
             "description": "The company's website domain, to also count stories that link to it.",
-            "type": "string"
+            "type": "string",
+            "maxLength": 253
           },
           "years": {
             "description": "How many calendar years to count, ending with this one, from 1 to 10; defaults to 6.",
@@ -739,7 +744,7 @@
             }
           },
           "top_threads": {
-            "description": "The stories mentioning the name that have the most points.",
+            "description": "The stories mentioning the name that have the most points, drawn from across all years, not only the years counted.",
             "type": "array",
             "items": {
               "type": "object",
@@ -812,7 +817,8 @@
           },
           "domain": {
             "description": "The company's website domain, whose first label is tried as a second name.",
-            "type": "string"
+            "type": "string",
+            "maxLength": 253
           },
           "state": {
             "description": "The company's two-letter US state, used to rank matching companies first.",

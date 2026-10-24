@@ -1,7 +1,7 @@
 import { TTL_EDGAR } from "../config";
 import { cached } from "../shared/cache";
 import { politeFetch, type FailedOutcome, type Fetcher } from "../shared/http";
-import { cleanCompanyName } from "../shared/inputs";
+import { cleanCompanyName, MAX_CLEANED_NAME_CHARS } from "../shared/inputs";
 
 /**
  * Forms a company files. An entity is listed only if it has filed at least one of these, matched exactly
@@ -287,9 +287,14 @@ export function isListableCompany(sub: Submissions): boolean {
   return sub.filings.some((f) => COMPANY_FORMS.has(f.form.toUpperCase()));
 }
 
-/** A name for comparing: no case, punctuation, EDGAR state tags such as /DE/ or (DE), or trailing legal-form words. */
+/**
+ * A name for comparing: no case, punctuation, EDGAR state tags such as /DE/ or (DE), or trailing legal-form
+ * words. Only the first 200 characters are read, as in cleanCompanyName: the tag patterns are quadratic in a
+ * long run of spaces, and search hits come from upstream.
+ */
 export function normalizeEntityName(s: string): string {
   const undecorated = s
+    .slice(0, MAX_CLEANED_NAME_CHARS)
     .replace(/\s*\/[A-Za-z]{2,3}\/\s*$/, "")
     .replace(/\s*\(\s*[A-Za-z]{2}\s*\)\s*$/, "")
     .replace(/\b(?:[A-Za-z]\.){2,}/g, (m) => m.replace(/\./g, ""));

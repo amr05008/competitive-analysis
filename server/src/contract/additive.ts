@@ -6,6 +6,8 @@
 // - removes a tool, an input or an output field, or changes a field's type
 // - makes an input required, or a guaranteed output optional
 // - adds a value to an output's enum or const, or drops that list
+// - changes or drops an output's pattern or format, or loosens or drops its
+//   minimum, maximum, minLength, maxLength, minItems or maxItems
 // - closes an output object to extra properties
 // - removes a value from an input's enum, or adds an enum to an input
 // - tightens an input's minimum, maximum, minLength, maxLength, minItems or
@@ -77,7 +79,7 @@ function compare(was: JsonSchema, now: JsonSchema, side: Side, path: string, rep
     const w = part(was, type);
     const n = part(now, type);
     if (!w || !n) continue;
-    if (side === "output") checkOutputValues(w, n, label, report);
+    if (side === "output") checkOutputLimits(w, n, label, report);
     else checkInputLimits(w, n, label, report);
     if (type === "object") compareObjects(w, n, side, path, label, report);
     if (type === "array" && w.items && n.items) compare(w.items, n.items, side, `${path}[]`, report);
@@ -105,16 +107,32 @@ function compareObjects(was: JsonSchema, now: JsonSchema, side: Side, path: stri
   }
 }
 
-/** Outputs: an enum or const may only shrink, and never disappear. */
-function checkOutputValues(was: JsonSchema, now: JsonSchema, label: string, report: Report): void {
+/**
+ * Outputs: an enum or const may only shrink, and never disappear; a pattern or format may not change or
+ * disappear; bounds may only tighten. Anything else lets a new output fail the old schema.
+ */
+function checkOutputLimits(was: JsonSchema, now: JsonSchema, label: string, report: Report): void {
   const wasValues = valuesOf(was);
-  if (!wasValues) return;
-  const nowValues = valuesOf(now);
-  if (!nowValues) {
-    report(`dropped the value list of ${label}`);
-    return;
+  if (wasValues) {
+    const nowValues = valuesOf(now);
+    if (!nowValues) report(`dropped the value list of ${label}`);
+    else for (const value of nowValues) if (!wasValues.includes(value)) report(`added value ${value} to ${label}`);
   }
-  for (const value of nowValues) if (!wasValues.includes(value)) report(`added value ${value} to ${label}`);
+  for (const key of LOWER_BOUNDS) {
+    const w = numberAt(was, key);
+    const n = numberAt(now, key);
+    if (w !== undefined && (n === undefined || n < w)) report(`loosened ${key} of ${label} from ${w} to ${n ?? "none"}`);
+  }
+  for (const key of UPPER_BOUNDS) {
+    const w = numberAt(was, key);
+    const n = numberAt(now, key);
+    if (w !== undefined && (n === undefined || n > w)) report(`loosened ${key} of ${label} from ${w} to ${n ?? "none"}`);
+  }
+  for (const key of FORMATS) {
+    if (was[key] !== undefined && now[key] !== was[key]) {
+      report(`${now[key] === undefined ? "dropped" : "changed"} the ${key} of ${label}`);
+    }
+  }
 }
 
 /** Inputs: an enum may only grow, bounds may only loosen, and no new pattern or format. */

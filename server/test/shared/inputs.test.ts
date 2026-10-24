@@ -44,4 +44,11 @@ describe("cleanCompanyName", () => {
   ])("%j -> %j", (a, b) => {
     expect(cleanCompanyName(a)).toBe(b);
   });
+
+  it("cleans a 20 KB name in linear time, reading only its first 200 characters", () => {
+    const start = performance.now();
+    const cleaned = cleanCompanyName(`${" ,".repeat(10_000)}x`);
+    expect(performance.now() - start).toBeLessThan(50);
+    expect(cleaned.length).toBeLessThanOrEqual(200);
+  });
 });

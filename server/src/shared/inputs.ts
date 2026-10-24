@@ -56,10 +56,15 @@ export function normalizeDomain(s: string): { ok: true; domain: string } | Bad {
 }
 
 const SUFFIX = /[\s,]+(?:inc|llc|ltd|corp|corporation|co|gmbh|pbc|plc)\.?$/i;
+/**
+ * The most characters of a name that are cleaned. SUFFIX takes time quadratic in a long run of spaces
+ * and commas, and no company name is this long.
+ */
+export const MAX_CLEANED_NAME_CHARS = 200;
 
-/** Collapse whitespace and strip trailing legal-form words ("Acme Co., Ltd." -> "Acme"). */
+/** Collapse whitespace and strip trailing legal-form words ("Acme Co., Ltd." -> "Acme"), from the first 200 characters. */
 export function cleanCompanyName(s: string): string {
-  let name = s.trim().replace(/\s+/g, " ");
+  let name = s.slice(0, MAX_CLEANED_NAME_CHARS).trim().replace(/\s+/g, " ");
   for (let prev = ""; prev !== name; ) {
     prev = name;
     name = name.replace(SUFFIX, "").trim().replace(/,+$/, "").trim();

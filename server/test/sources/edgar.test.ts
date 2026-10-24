@@ -230,6 +230,13 @@ describe("normalizeEntityName", () => {
     expect(normalizeEntityName("Stripes V, LP")).not.toBe("stripe");
     expect(normalizeEntityName("Stripe, Inc.")).not.toBe(normalizeEntityName("Strip"));
   });
+  it("normalizes a 20 KB name in linear time", () => {
+    const start = performance.now();
+    normalizeEntityName(`a${" ".repeat(20_000)}b`);
+    normalizeEntityName(`${" ,".repeat(10_000)}x`);
+    expect(performance.now() - start).toBeLessThan(50);
+  });
+
   it("strips EDGAR's conformed-name decorations", () => {
     expect(normalizeEntityName("MATTEL INC /DE/")).toBe("mattel");
     expect(normalizeEntityName("ACME L.L.C.")).toBe("acme");

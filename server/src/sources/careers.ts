@@ -5,8 +5,10 @@ import { politeFetch, type Fetcher } from "../shared/http";
 
 const PATHS = ["/careers", "/jobs", "/company/careers", "/about/careers"];
 
+// The embed pattern reads at most 300 characters of query string before for=: an unbounded run backtracks
+// over every & in it, which a crafted page can make quadratic.
 const PATTERNS: { ats: Ats; re: RegExp }[] = [
-  { ats: "greenhouse", re: /(?:job-boards|boards)(?:\.eu)?\.greenhouse\.io\\?\/embed\\?\/job_board(?:\\?\/js)?\?(?:[^"'\s<>]*&(?:amp;)?)?for=([\w-]+)/gi },
+  { ats: "greenhouse", re: /(?:job-boards|boards)(?:\.eu)?\.greenhouse\.io\\?\/embed\\?\/job_board(?:\\?\/js)?\?(?:[^"'\s<>]{0,300}&(?:amp;)?)?for=([\w-]+)/gi },
   { ats: "greenhouse", re: /(?:job-boards|boards)(?:\.eu)?\.greenhouse\.io\\?\/(?!embed\b)([\w-]+)/gi },
   { ats: "ashby", re: /jobs\.ashbyhq\.com\\?\/([\w-]+)/gi },
   { ats: "lever", re: /jobs\.lever\.co\\?\/([\w-]+)/gi },

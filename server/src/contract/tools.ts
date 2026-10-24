@@ -26,16 +26,22 @@ const ANNOTATIONS = {
 
 const MONTH = /^\d{4}-\d{2}$/;
 const count = () => z.number().int().nonnegative();
+/** Caps on text inputs, so no input can make a call do unbounded work. */
+const MAX_URL_CHARS = 2000;
+const MAX_DOMAIN_CHARS = 253;
+const MAX_COMPANY_NAME_CHARS = 120;
+const MAX_ROLE_ID_CHARS = 64;
+const domainInput = () => z.string().max(MAX_DOMAIN_CHARS);
 
 // ---------------------------------------------------------------- page_history
 
 export const pageHistoryInput = {
-  url: z.string().describe("The company page to check, such as https://example.com/pricing."),
+  url: z.string().max(MAX_URL_CHARS).describe("The company page to check, such as https://example.com/pricing."),
   from: z
     .string()
     .regex(MONTH)
     .optional()
-    .describe("The first month to search, as YYYY-MM; defaults to 24 months before to."),
+    .describe("The first month to search, as YYYY-MM. Defaults to 24 months before the last month; the earliest is 1996-01."),
   to: z.string().regex(MONTH).optional().describe("The last month to search, as YYYY-MM; defaults to this month."),
   max_changes: z
     .number()
@@ -99,13 +105,14 @@ export const ATS = ["greenhouse", "lever", "ashby"] as const;
 export type Ats = (typeof ATS)[number];
 
 export const jobOpeningsInput = {
-  domain: z.string().describe("The company's website domain, such as example.com."),
+  domain: domainInput().describe("The company's website domain, such as example.com."),
   company_name: z
     .string()
+    .max(MAX_COMPANY_NAME_CHARS)
     .optional()
     .describe("The company's name, used to find its board when the name differs from the domain."),
   role_ids: z
-    .array(z.string())
+    .array(z.string().max(MAX_ROLE_ID_CHARS))
     .max(5)
     .optional()
     .describe("Up to five role ids from an earlier call, to get those roles' full descriptions."),
@@ -163,8 +170,7 @@ export const jobOpeningsOutput = {
 
 export const hnInput = {
   query: z.string().min(2).max(80).describe("The company or product name to search for."),
-  domain: z
-    .string()
+  domain: domainInput()
     .optional()
     .describe("The company's website domain, to also count stories that link to it."),
   years: z
@@ -211,15 +217,14 @@ export const hnOutput = {
       }),
     )
     .optional()
-    .describe("The stories mentioning the name that have the most points."),
+    .describe("The stories mentioning the name that have the most points, drawn from across all years, not only the years counted."),
 };
 
 // ----------------------------------------------------------------- sec_filings
 
 export const secInput = {
-  company_name: z.string().min(2).max(120).describe("The company's name, such as Example Inc."),
-  domain: z
-    .string()
+  company_name: z.string().min(2).max(MAX_COMPANY_NAME_CHARS).describe("The company's name, such as Example Inc."),
+  domain: domainInput()
     .optional()
     .describe("The company's website domain, whose first label is tried as a second name."),
   state: z
