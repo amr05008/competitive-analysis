@@ -32,3 +32,20 @@ export const PAGE_HISTORY_DEADLINE_MS = 25_000;
 export const RESPONSE_CAP_CHARS = 20_000;
 /** The most characters in one tool result's text rendering; the structured result carries the rest. */
 export const RENDER_MAX_CHARS = 4_000;
+
+/** The most upstream fetches job_openings makes in one call. */
+export const JOBS_MAX_FETCHES = 20;
+/** How long job_openings may keep starting fetches, counted from the start of the call. */
+export const JOBS_DEADLINE_MS = 25_000;
+/** How long a job board's role list is cached: one hour. */
+export const TTL_BOARD = 3_600;
+/** The most roles job_openings returns when no role_ids are given; counts still cover every role. */
+export const MAX_ROLES = 40;
+/** The most role ids job_openings accepts. */
+export const MAX_ROLE_IDS = 5;
+/** The most characters of one role's description. */
+export const ROLE_DESCRIPTION_MAX_CHARS = 3_000;
+/** The most bytes read from one careers page. */
+export const CAREERS_MAX_BYTES = 512_000;
+/** The most bytes read from one job board's role list (a large Lever board is several megabytes). */
+export const BOARD_MAX_BYTES = 12_000_000;

@@ -1,0 +1,696 @@
+{
+ "departments": [
+  {
+   "id": 241706,
+   "name": "1134 APAC Sales Development Reps",
+   "parent_id": 150327,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=8303082",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3590044,
+     "location": {
+      "name": "Bengaluru"
+     },
+     "metadata": null,
+     "id": 8303082,
+     "updated_at": "2026-10-22T21:41:31-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Sales Development Representative, India",
+     "company_name": "Stripe",
+     "first_published": "2026-10-22T21:35:13-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 337843,
+   "name": "1136 Product Sales Development Reps",
+   "parent_id": 150327,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=8179341",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": true
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3539574,
+     "location": {
+      "name": "Singapore"
+     },
+     "metadata": null,
+     "id": 8179341,
+     "updated_at": "2026-10-21T14:53:01-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Product Sales Development Representative (Mandarin-speaking)",
+     "company_name": "Stripe",
+     "first_published": "2026-09-07T01:55:28-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 388575,
+   "name": "1152 Solutions Architecture (EMEA)",
+   "parent_id": 81959,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=8144264",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3524493,
+     "location": {
+      "name": "Dublin"
+     },
+     "metadata": null,
+     "id": 8144264,
+     "updated_at": "2026-10-22T09:16:14-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Solutions Architect, Commercial, UK/I",
+     "company_name": "Stripe",
+     "first_published": "2026-09-09T05:22:50-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 76996,
+   "name": "1170 GEO Sales HQ (NA)",
+   "parent_id": 81961,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=8181026",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3540179,
+     "location": {
+      "name": "San Francisco"
+     },
+     "metadata": null,
+     "id": 8181026,
+     "updated_at": "2026-10-22T09:17:09-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Startup Partnerships - Y Combinator ",
+     "company_name": "Stripe",
+     "first_published": "2026-09-15T16:54:32-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 81431,
+   "name": "1185 Account Executives (EMEA)",
+   "parent_id": 81962,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=8079514",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3500386,
+     "location": {
+      "name": "London"
+     },
+     "metadata": null,
+     "id": 8079514,
+     "updated_at": "2026-10-22T09:16:13-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Account Executive, hunter",
+     "company_name": "Stripe",
+     "first_published": "2026-08-10T06:49:09-04:00",
+     "language": "en",
+     "application_deadline": null
+    },
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=8195480",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3546875,
+     "location": {
+      "name": "Dublin"
+     },
+     "metadata": null,
+     "id": 8195480,
+     "updated_at": "2026-10-22T09:16:15-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Account Executive - Velocity SMB Grower",
+     "company_name": "Stripe",
+     "first_published": "2026-09-23T11:59:45-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 61573,
+   "name": "1510 Global Business Services",
+   "parent_id": 81965,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=8224617",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3559488,
+     "location": {
+      "name": "South San Francisco, CA"
+     },
+     "metadata": null,
+     "id": 8224617,
+     "updated_at": "2026-10-22T09:17:10-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Commercial Lead",
+     "company_name": "Stripe",
+     "first_published": "2026-10-08T20:55:34-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 78929,
+   "name": "1630 Alliances & Channels",
+   "parent_id": 81967,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=7461966",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3315749,
+     "location": {
+      "name": "US-SF"
+     },
+     "metadata": null,
+     "id": 7461966,
+     "updated_at": "2026-10-22T09:17:04-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Partner Development Manager, Global Strategic Alliances",
+     "company_name": "Stripe",
+     "first_published": "2025-12-11T10:04:17-05:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 86074,
+   "name": "1641 Product Sales - RFA ex Billing",
+   "parent_id": 401044,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=8190059",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3544096,
+     "location": {
+      "name": "US-SF-HQ, US-NYC, US-CHI, US-SEA"
+     },
+     "metadata": null,
+     "id": 8190059,
+     "updated_at": "2026-10-22T09:17:09-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Account Executive, Product Sales (Data)",
+     "company_name": "Stripe",
+     "first_published": "2026-10-05T12:08:53-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 68129,
+   "name": "4130 Technical Account Management, Support & Services - AMER",
+   "parent_id": 299951,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=8152136",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3527781,
+     "location": {
+      "name": "San Francisco or Seattle"
+     },
+     "metadata": null,
+     "id": 8152136,
+     "updated_at": "2026-10-22T09:17:07-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Manager, Technical Account Management",
+     "company_name": "Stripe",
+     "first_published": "2026-09-04T15:01:59-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 241710,
+   "name": "4204 SDC - MonOps",
+   "parent_id": 78708,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=7950828",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3452686,
+     "location": {
+      "name": "Bengaluru"
+     },
+     "metadata": null,
+     "id": 7950828,
+     "updated_at": "2026-10-21T14:53:01-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Head of Finance Operations",
+     "company_name": "Stripe",
+     "first_published": "2026-06-04T02:45:23-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 299945,
+   "name": "4899 SDC - Bridge RiskOps",
+   "parent_id": 258050,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=8066310",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3495224,
+     "location": {
+      "name": "Bengaluru"
+     },
+     "metadata": null,
+     "id": 8066310,
+     "updated_at": "2026-10-21T14:53:01-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Fraud Operations Associate SDC",
+     "company_name": "Stripe",
+     "first_published": "2026-07-20T01:52:52-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 84360,
+   "name": "5112 General University",
+   "parent_id": 84359,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=8194287",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3545645,
+     "location": {
+      "name": "Toronto"
+     },
+     "metadata": null,
+     "id": 8194287,
+     "updated_at": "2026-10-22T09:15:17-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Data Analyst, Intern",
+     "company_name": "Stripe",
+     "first_published": "2026-10-01T11:05:36-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 62016,
+   "name": "6480 Internal Audit",
+   "parent_id": 257111,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=8026689",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3479663,
+     "location": {
+      "name": "Toronto, New York, San Francisco, Atlanta, Seattle "
+     },
+     "metadata": null,
+     "id": 8026689,
+     "updated_at": "2026-10-22T09:17:05-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Internal Audit Data Analytics Lead",
+     "company_name": "Stripe",
+     "first_published": "2026-06-26T09:48:43-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 68139,
+   "name": "7420 Finance Systems",
+   "parent_id": 78734,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=7543868",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3339485,
+     "location": {
+      "name": "Bengaluru, India"
+     },
+     "metadata": null,
+     "id": 7543868,
+     "updated_at": "2026-10-23T06:06:36-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Software Engineer, Financial Business Insights",
+     "company_name": "Stripe",
+     "first_published": "2026-01-27T22:58:55-05:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 236784,
+   "name": "8504 Bridge - R&D",
+   "parent_id": 236783,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=7776179",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3372021,
+     "location": {
+      "name": "SF, New York, Seattle"
+     },
+     "metadata": null,
+     "id": 7776179,
+     "updated_at": "2026-10-22T09:17:04-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Security Engineer, Bridge",
+     "company_name": "Stripe",
+     "first_published": "2026-04-02T15:12:42-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 66161,
+   "name": "8516 Payments Global",
+   "parent_id": 340725,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=8256027",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": true
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3572595,
+     "location": {
+      "name": "Singapore"
+     },
+     "metadata": null,
+     "id": 8256027,
+     "updated_at": "2026-10-22T05:39:17-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Engineering Manager, Payments",
+     "company_name": "Stripe",
+     "first_published": "2026-10-22T05:32:50-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 67370,
+   "name": "8560 Bank Connections - Eng",
+   "parent_id": 88186,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=8148653",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3526198,
+     "location": {
+      "name": "New York"
+     },
+     "metadata": null,
+     "id": 8148653,
+     "updated_at": "2026-10-22T09:17:07-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Staff Machine Learning Engineer, Financial Connections",
+     "company_name": "Stripe",
+     "first_published": "2026-08-24T21:06:11-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 81946,
+   "name": "8611 Security Analytics",
+   "parent_id": 78876,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=8172487",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3537052,
+     "location": {
+      "name": "Dublin"
+     },
+     "metadata": null,
+     "id": 8172487,
+     "updated_at": "2026-10-22T09:16:14-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Abuse Investigator",
+     "company_name": "Stripe",
+     "first_published": "2026-09-03T13:30:34-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  },
+  {
+   "id": 68133,
+   "name": "8811 Product Design",
+   "parent_id": 78815,
+   "child_ids": [],
+   "jobs": [
+    {
+     "absolute_url": "https://stripe.com/jobs/search?gh_jid=7954207",
+     "data_compliance": [
+      {
+       "type": "gdpr",
+       "requires_consent": false,
+       "requires_processing_consent": false,
+       "requires_retention_consent": false,
+       "retention_period": null,
+       "demographic_data_consent_applies": false
+      }
+     ],
+     "education": "education_required",
+     "internal_job_id": 3453507,
+     "location": {
+      "name": "US / Canada"
+     },
+     "metadata": null,
+     "id": 7954207,
+     "updated_at": "2026-10-22T09:17:05-04:00",
+     "requisition_id": "See Opening ID",
+     "title": "Product Designer, Internal Tools",
+     "company_name": "Stripe",
+     "first_published": "2026-05-29T11:48:35-04:00",
+     "language": "en",
+     "application_deadline": null
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,36 @@
+{
+ "jobs": [
+  {
+   "id": "7f302222-2e06-4e37-8766-87b3bf6068e6",
+   "title": "Backend Engineer, Platform",
+   "department": "Engineering",
+   "team": "Engineering",
+   "employmentType": "FullTime",
+   "location": "San Francisco",
+   "shouldDisplayCompensationOnJobPostings": false,
+   "secondaryLocations": [],
+   "publishedAt": "2021-03-16T09:00:46.953+00:00",
+   "isListed": true,
+   "isRemote": true,
+   "workplaceType": "Remote",
+   "address": {
+    "postalAddress": {
+     "addressRegion": "California",
+     "addressCountry": "USA",
+     "addressLocality": "San Francisco"
+    }
+   },
+   "jobUrl": "https://jobs.ashbyhq.com/hightouch/7f302222-2e06-4e37-8766-87b3bf6068e6",
+   "applyUrl": "https://jobs.ashbyhq.com/hightouch/7f302222-2e06-4e37-8766-87b3bf6068e6/application",
+   "descriptionHtml": "<h2>Please drop us a line at <a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"mailto:jobs@example.com\"><strong>jobs@example.com</strong></a>. We're excited to meet you!</h2><h2></h2><h2>The product</h2><p style=\"min-height:1.5em\">Data warehouses like Snowflake and BigQuery are shifting how companies think of centralizing data. They're becoming <em>the standard place</em> to centralize customer data at a company, given how cheap and accessible warehouses have become. <a targe",
+   "descriptionPlain": "PLEASE DROP US A LINE AT jobs@example.com. WE'RE EXCITED TO MEET YOU!\n\n\n\n\n\nTHE PRODUCT\n\nData warehouses like Snowflake and BigQuery are shifting how companies think of centralizing data. They're becoming the standard place to centralize customer data at a company, given how cheap and accessible warehouses have become. HIghtouch.io http://hightouch.io exists to help companies get their data out of the warehouse (reverse ETL) and into the hands of sales, marketing, and product teams.\n\nBusines",
+   "compensation": {
+    "compensationTierSummary": null,
+    "scrapeableCompensationSalarySummary": null,
+    "compensationTiers": [],
+    "summaryComponents": []
+   }
+  }
+ ],
+ "apiVersion": "1"
+}

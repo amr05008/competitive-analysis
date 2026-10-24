@@ -1,7 +1,8 @@
 import { RENDER_MAX_CHARS } from "../config";
 import { errorResult } from "../contract/envelope";
-import type { PageHistoryResult, ToolInputs, ToolName, ToolResult, ToolResults } from "../contract/tools";
+import type { JobOpeningsResult, PageHistoryResult, ToolInputs, ToolName, ToolResult, ToolResults } from "../contract/tools";
 import type { ArchiveFetch, Fetcher } from "../shared/http";
+import { jobOpenings, renderJobOpenings } from "./job-openings";
 import { pageHistory, renderPageHistory } from "./page-history";
 
 /** What a tool may reach: every outbound request goes through these. */
@@ -13,7 +14,7 @@ const notBuiltYet = async () => errorResult("source_unavailable", "not built yet
 
 export const IMPLEMENTATIONS: { [K in ToolName]: Implementation<K> } = {
   page_history: pageHistory,
-  job_openings: notBuiltYet,
+  job_openings: jobOpenings,
   hacker_news_mentions: notBuiltYet,
   sec_filings: notBuiltYet,
 };
@@ -35,6 +36,11 @@ export function capText(text: string, max: number = RENDER_MAX_CHARS): string {
 
 /** The short text rendering that goes with a result's structured content, at most RENDER_MAX_CHARS long. */
 export function render(name: ToolName, result: ToolResult): string {
-  const text = name === "page_history" ? renderPageHistory(result as PageHistoryResult) : JSON.stringify(result);
+  const text =
+    name === "page_history"
+      ? renderPageHistory(result as PageHistoryResult)
+      : name === "job_openings"
+        ? renderJobOpenings(result as JobOpeningsResult)
+        : JSON.stringify(result);
   return capText(text);
 }

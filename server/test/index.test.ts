@@ -57,7 +57,7 @@ describe("MCP endpoint", () => {
   // input it refuses as bad_input before any fetch: tests never reach live sources.
   it.each([
     ["page_history", { url: "http://127.0.0.1/" }],
-    ["job_openings", { domain: "example.com" }],
+    ["job_openings", { domain: "127.0.0.1" }],
     ["hacker_news_mentions", { query: "Example" }],
     ["sec_filings", { company_name: "Example" }],
   ])("calling %s returns an error envelope with the fallback line", async (name, args) => {
