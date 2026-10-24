@@ -49,3 +49,12 @@ export const ROLE_DESCRIPTION_MAX_CHARS = 3_000;
 export const CAREERS_MAX_BYTES = 512_000;
 /** The most bytes read from one job board's role list (a large Lever board is several megabytes). */
 export const BOARD_MAX_BYTES = 12_000_000;
+
+/** The most upstream fetches hacker_news_mentions makes in one call. */
+export const HN_MAX_FETCHES = 32;
+/** How long hacker_news_mentions may keep starting fetches, counted from the start of the call. */
+export const HN_DEADLINE_MS = 25_000;
+/** How long a Hacker News search answer is cached: six hours. */
+export const TTL_HN = 21_600;
+/** The most top threads hacker_news_mentions lists. */
+export const MAX_THREADS = 10;

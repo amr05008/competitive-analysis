@@ -58,7 +58,7 @@ describe("MCP endpoint", () => {
   it.each([
     ["page_history", { url: "http://127.0.0.1/" }],
     ["job_openings", { domain: "127.0.0.1" }],
-    ["hacker_news_mentions", { query: "Example" }],
+    ["hacker_news_mentions", { query: "Example", domain: "127.0.0.1" }],
     ["sec_filings", { company_name: "Example" }],
   ])("calling %s returns an error envelope with the fallback line", async (name, args) => {
     const result = await rpc("tools/call", { name, arguments: args });

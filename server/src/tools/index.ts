@@ -1,7 +1,8 @@
 import { RENDER_MAX_CHARS } from "../config";
 import { errorResult } from "../contract/envelope";
-import type { JobOpeningsResult, PageHistoryResult, ToolInputs, ToolName, ToolResult, ToolResults } from "../contract/tools";
+import type { HnResult, JobOpeningsResult, PageHistoryResult, ToolInputs, ToolName, ToolResult, ToolResults } from "../contract/tools";
 import type { ArchiveFetch, Fetcher } from "../shared/http";
+import { hackerNewsMentions, renderHn } from "./hn-mentions";
 import { jobOpenings, renderJobOpenings } from "./job-openings";
 import { pageHistory, renderPageHistory } from "./page-history";
 
@@ -15,7 +16,7 @@ const notBuiltYet = async () => errorResult("source_unavailable", "not built yet
 export const IMPLEMENTATIONS: { [K in ToolName]: Implementation<K> } = {
   page_history: pageHistory,
   job_openings: jobOpenings,
-  hacker_news_mentions: notBuiltYet,
+  hacker_news_mentions: hackerNewsMentions,
   sec_filings: notBuiltYet,
 };
 
@@ -41,6 +42,8 @@ export function render(name: ToolName, result: ToolResult): string {
       ? renderPageHistory(result as PageHistoryResult)
       : name === "job_openings"
         ? renderJobOpenings(result as JobOpeningsResult)
-        : JSON.stringify(result);
+        : name === "hacker_news_mentions"
+          ? renderHn(result as HnResult)
+          : JSON.stringify(result);
   return capText(text);
 }
