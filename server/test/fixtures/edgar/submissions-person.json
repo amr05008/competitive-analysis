@@ -1,0 +1,22 @@
+{
+  "cik": "0009999999",
+  "entityType": "",
+  "sic": "",
+  "sicDescription": "",
+  "insiderTransactionForOwnerExists": 1,
+  "insiderTransactionForIssuerExists": 0,
+  "name": "Person A",
+  "tickers": [],
+  "exchanges": [],
+  "stateOfIncorporation": "",
+  "addresses": { "mailing": {}, "business": { "stateOrCountry": "CA" } },
+  "formerNames": [],
+  "filings": {
+    "recent": {
+      "accessionNumber": ["0009999999-24-000003", "0009999999-24-000002", "0009999999-24-000001"],
+      "filingDate": ["2024-06-03", "2024-03-01", "2023-11-20"],
+      "form": ["4", "4", "4"],
+      "primaryDocument": ["xslF345X05/doc4.xml", "xslF345X05/doc4.xml", "xslF345X05/doc4.xml"]
+    }
+  }
+}

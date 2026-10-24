@@ -17,4 +17,16 @@ describe("fixtures", () => {
     }
     expect(seen).toBeGreaterThan(0);
   });
+
+  it("Form D fixtures carry only placeholder people", () => {
+    let seen = 0;
+    for (const [path, text] of Object.entries(files)) {
+      if (!path.endsWith(".xml")) continue;
+      for (const m of text.matchAll(/<(firstName|middleName|lastName|nameOfSigner|signatureName|recipientName)>([^<]*)<\/\1>/g)) {
+        seen++;
+        expect(m[2], `${path} ${m[1]}`).toMatch(/^(Person( [A-Z])?|[A-Z])$/);
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
+  });
 });

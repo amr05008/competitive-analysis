@@ -10,7 +10,7 @@ describe("render", () => {
       notes: Array.from({ length: 300 }, (_, i) => `note ${i} `.padEnd(40, "x")),
       retrieved_at: "2026-10-20",
     };
-    const text = render("sec_filings", big);
+    const text = capText(JSON.stringify(big));
     expect(JSON.stringify(big).length).toBeGreaterThan(4000);
     expect(text.length).toBe(4000);
     expect(text.endsWith(`\n${MORE_LINE}`)).toBe(true);
@@ -19,7 +19,8 @@ describe("render", () => {
 
   it("leaves a short rendering unchanged", () => {
     const small = errorResult("bad_input", "IP addresses are not accepted", [], Date.UTC(2026, 9, 20));
-    expect(render("sec_filings", small)).toBe(JSON.stringify(small));
+    expect(capText(JSON.stringify(small))).toBe(JSON.stringify(small));
+    expect(render("sec_filings", small)).toBe("sec_filings failed (bad_input): IP addresses are not accepted. fall back to browsing for this check.");
   });
 
   it("keeps whole lines when it can", () => {

@@ -58,3 +58,18 @@ export const HN_DEADLINE_MS = 25_000;
 export const TTL_HN = 21_600;
 /** The most top threads hacker_news_mentions lists. */
 export const MAX_THREADS = 10;
+
+/** The most upstream fetches sec_filings makes in one call. */
+export const SEC_MAX_FETCHES = 25;
+/** How long sec_filings may keep starting fetches, counted from the start of the call. */
+export const SEC_DEADLINE_MS = 25_000;
+/** How long an EDGAR answer is cached: one day. */
+export const TTL_EDGAR = 86_400;
+/** The most companies sec_filings returns. */
+export const MAX_ENTITIES = 5;
+/** The most recent filings sec_filings lists per company. */
+export const MAX_FILINGS = 20;
+/** The most Form D notices sec_filings reads per company. */
+export const MAX_FORM_D = 5;
+/** The shortest time between the starts of two EDGAR requests within one call. */
+export const EDGAR_GAP_MS = 150;
