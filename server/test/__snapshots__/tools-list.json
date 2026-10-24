@@ -73,14 +73,7 @@
             "properties": {
               "reason": {
                 "type": "string",
-                "enum": [
-                  "source_rate_limited",
-                  "source_unavailable",
-                  "server_busy",
-                  "not_found",
-                  "bad_input"
-                ],
-                "description": "The kind of failure."
+                "description": "The kind of failure, one of: source_rate_limited, source_unavailable, server_busy, not_found, bad_input."
               },
               "detail": {
                 "type": "string",
@@ -377,14 +370,7 @@
             "properties": {
               "reason": {
                 "type": "string",
-                "enum": [
-                  "source_rate_limited",
-                  "source_unavailable",
-                  "server_busy",
-                  "not_found",
-                  "bad_input"
-                ],
-                "description": "The kind of failure."
+                "description": "The kind of failure, one of: source_rate_limited, source_unavailable, server_busy, not_found, bad_input."
               },
               "detail": {
                 "type": "string",
@@ -419,12 +405,7 @@
                 "properties": {
                   "ats": {
                     "type": "string",
-                    "enum": [
-                      "greenhouse",
-                      "lever",
-                      "ashby"
-                    ],
-                    "description": "The service that hosts the board."
+                    "description": "The service that hosts the board, one of: greenhouse, lever, ashby."
                   },
                   "slug": {
                     "type": "string",
@@ -674,14 +655,7 @@
             "properties": {
               "reason": {
                 "type": "string",
-                "enum": [
-                  "source_rate_limited",
-                  "source_unavailable",
-                  "server_busy",
-                  "not_found",
-                  "bad_input"
-                ],
-                "description": "The kind of failure."
+                "description": "The kind of failure, one of: source_rate_limited, source_unavailable, server_busy, not_found, bad_input."
               },
               "detail": {
                 "type": "string",
@@ -891,14 +865,7 @@
             "properties": {
               "reason": {
                 "type": "string",
-                "enum": [
-                  "source_rate_limited",
-                  "source_unavailable",
-                  "server_busy",
-                  "not_found",
-                  "bad_input"
-                ],
-                "description": "The kind of failure."
+                "description": "The kind of failure, one of: source_rate_limited, source_unavailable, server_busy, not_found, bad_input."
               },
               "detail": {
                 "type": "string",

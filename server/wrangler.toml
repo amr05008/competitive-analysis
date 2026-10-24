@@ -1,7 +1,9 @@
 # Top level is the dev environment; tests use it too.
 name = "competitive-analysis-dev"
 main = "src/index.ts"
-compatibility_date = "2026-10-01"
+# The newest date the test pool's bundled workerd (1.20260815.1) supports, so
+# tests and production run the same runtime flags. Raise it with the pool.
+compatibility_date = "2026-08-15"
 compatibility_flags = ["nodejs_compat"]
 
 workers_dev = false

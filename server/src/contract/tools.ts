@@ -3,7 +3,7 @@
 // additive.ts); `npm test` compares tools/list against the committed snapshot.
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { envelopeShape, outputObject } from "./envelope";
+import { envelopeShape, outputEnum, outputObject } from "./envelope";
 
 export const TOOL_NAMES = ["page_history", "job_openings", "hacker_news_mentions", "sec_filings"] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -94,6 +94,10 @@ export const pageHistoryOutput = {
 
 // ---------------------------------------------------------------- job_openings
 
+/** The job board services job_openings reads. Services may be added, never removed. */
+export const ATS = ["greenhouse", "lever", "ashby"] as const;
+export type Ats = (typeof ATS)[number];
+
 export const jobOpeningsInput = {
   domain: z.string().describe("The company's website domain, such as example.com."),
   company_name: z
@@ -115,7 +119,7 @@ const nameCount = outputObject({
 export const jobOpeningsOutput = {
   ...envelopeShape,
   board: outputObject({
-    ats: z.enum(["greenhouse", "lever", "ashby"]).describe("The service that hosts the board."),
+    ats: outputEnum(ATS, "The service that hosts the board"),
     slug: z.string().describe("The company's board name on that service."),
     url: z.string().describe("A link to the board."),
   })

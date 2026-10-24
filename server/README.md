@@ -50,5 +50,8 @@ instead.
 
 - After editing `wrangler.toml`, run `npx wrangler types` and commit
   `worker-configuration.d.ts`.
-- Tests run on compatibility date 2026-08-15 rather than `wrangler.toml`'s 2026-10-01: the
-  test pool's bundled workerd doesn't support newer dates yet. See `vitest.config.ts`.
+- The compatibility date (2026-08-15) is the newest the test pool's bundled workerd supports,
+  so tests and production run the same runtime flags. Raise it when the pool catches up.
+- Output values from sets that may grow (error reasons, job board services) are plain strings
+  in the schema, with today's values listed in the description. The TypeScript types stay
+  closed, so the code only emits known values.

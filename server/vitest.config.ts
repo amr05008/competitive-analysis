@@ -8,10 +8,6 @@ export default defineConfig({
     cloudflareTest({
       wrangler: { configPath: "./wrangler.toml" },
       miniflare: {
-        // The pool's bundled workerd (1.20260815.1) supports compatibility dates
-        // only up to 2026-08-22, older than wrangler.toml's 2026-10-01. Tests
-        // run on the bundled runtime's own date until the pool catches up.
-        compatibilityDate: "2026-08-15",
         bindings: { DAILY_TOOL_CALL_CAP: "3" },
       },
     }),

@@ -43,6 +43,9 @@ describe("tools/list", () => {
     await expect(JSON.stringify(list, null, 2)).toMatchFileSnapshot(SNAPSHOT);
   });
 
+  // A failure here means the change breaks the approved contract, so it waits
+  // for a new plugin version (a new tool, reviewed again). Never silence it
+  // with -u.
   it("the committed snapshot to now is additive", async () => {
     expect(committed, `no committed snapshot at test/${SNAPSHOT.slice(2)}; run the tests again`).toBeDefined();
     const current: ToolListJson = await rpc("tools/list");

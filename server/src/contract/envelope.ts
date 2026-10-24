@@ -19,6 +19,15 @@ export const FALLBACK_LINE = "fall back to browsing for this check.";
  */
 export const outputObject = <S extends z.ZodRawShape>(shape: S) => z.looseObject(shape);
 
+/**
+ * An output value from a set that may grow, such as error reasons. Its JSON
+ * Schema is a plain string whose description lists today's values, so a value
+ * added later still validates against an approved schema. Its TypeScript type
+ * stays the closed union, so the code can only emit known values.
+ */
+export const outputEnum = <const T extends readonly [string, ...string[]]>(values: T, description: string) =>
+  z.string().describe(`${description}, one of: ${values.join(", ")}.`) as unknown as z.ZodType<T[number]>;
+
 /** The fields every tool's output starts with. */
 export const envelopeShape = {
   status: z
@@ -30,7 +39,7 @@ export const envelopeShape = {
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .describe("The UTC date this result was produced, as YYYY-MM-DD."),
   error: outputObject({
-    reason: z.enum(ERROR_REASONS).describe("The kind of failure."),
+    reason: outputEnum(ERROR_REASONS, "The kind of failure"),
     detail: z.string().describe("A short description of what went wrong."),
     tried: z.array(z.string()).describe("The sources or addresses that were tried."),
     fallback: z.literal(FALLBACK_LINE).describe("What to do instead."),
