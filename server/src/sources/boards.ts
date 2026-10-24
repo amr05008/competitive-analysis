@@ -20,7 +20,7 @@ export type RawRole = {
 };
 
 export type Board =
-  | { kind: "found"; ats: Ats; slug: string; /** The board's public page. */ url: string; /** The address that listed the roles. */ apiUrl: string; roles: RawRole[]; notes?: string[] }
+  | { kind: "found"; ats: Ats; slug: string; /** The board's public page. */ url: string; /** The address that listed the roles. */ apiUrl: string; roles: RawRole[]; /** Set when Greenhouse's departments lookup failed: the roles have no departments, and the read is never cached. */ departmentsError?: { reason: ErrorReason; detail: string } }
   | { kind: "absent"; url: string }
   | { kind: "error"; url: string; reason: ErrorReason; detail: string };
 
@@ -39,7 +39,14 @@ function decodeEntities(s: string): string {
 }
 
 const collapse = (s: string) => s.replace(/\s+/g, " ").trim();
-const cap = (s: string) => (s.length > ROLE_DESCRIPTION_MAX_CHARS ? s.slice(0, ROLE_DESCRIPTION_MAX_CHARS) : s);
+const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,}/gi;
+const PHONE = /(?:\+\d{1,3}[\s.-]?)?(?:\(\d{2,4}\)|\d{2,4})[\s.-]\d{3,4}[\s.-]\d{3,4}/g;
+
+/** A description as stored: email addresses and phone numbers removed, then capped. */
+const cap = (s: string) => {
+  const clean = s.replace(EMAIL, "[email removed]").replace(PHONE, "[phone removed]");
+  return clean.length > ROLE_DESCRIPTION_MAX_CHARS ? clean.slice(0, ROLE_DESCRIPTION_MAX_CHARS) : clean;
+};
 
 /** HTML, possibly escaped, as plain text: entities decoded, tags stripped, whitespace collapsed. */
 export function htmlToText(html: string): string {
@@ -229,14 +236,14 @@ async function readBoard(fetcher: Fetcher, ats: Ats, slug: string): Promise<Boar
   const r = await getJson(fetcher, url);
   const fail = (f: FailedOutcome): Board => ({ kind: "error", url, reason: f.reason, detail: f.detail });
   if (!r.ok) return r.reason === "not_found" ? { kind: "absent", url } : fail(r);
-  const found = (roles: RawRole[], notes?: string[]): Board => ({
+  const found = (roles: RawRole[], departmentsError?: { reason: ErrorReason; detail: string }): Board => ({
     kind: "found",
     ats,
     slug,
     url: boardUrl(ats, slug),
     apiUrl: url,
     roles,
-    ...(notes?.length ? { notes } : {}),
+    ...(departmentsError ? { departmentsError } : {}),
   });
 
   if (ats === "greenhouse") {
@@ -245,7 +252,7 @@ async function readBoard(fetcher: Fetcher, ats: Ats, slug: string): Promise<Boar
     const depsUrl = `${GH_API}/${encodeURIComponent(slug)}/departments`;
     const d = await getJson(fetcher, depsUrl);
     const map = new Map<string, string>();
-    const notes: string[] = [];
+    let departmentsError: { reason: ErrorReason; detail: string } | undefined;
     const list = d.ok && isObj(d.data) ? d.data.departments : null;
     if (Array.isArray(list)) {
       for (const dep of list.filter(isObj)) {
@@ -254,9 +261,9 @@ async function readBoard(fetcher: Fetcher, ats: Ats, slug: string): Promise<Boar
         for (const j of dep.jobs.filter(isObj)) if (j.id !== undefined && !map.has(String(j.id))) map.set(String(j.id), name);
       }
     } else {
-      notes.push(`the departments lookup failed (${d.ok ? "unexpected response shape" : `${d.reason}: ${d.detail}`}), so departments are missing`);
+      departmentsError = d.ok ? { reason: "source_unavailable", detail: "unexpected response shape" } : { reason: d.reason, detail: d.detail };
     }
-    return found(greenhouseRoles(jobs, map), notes);
+    return found(greenhouseRoles(jobs, map), departmentsError);
   }
   if (ats === "ashby") {
     const jobs = isObj(r.data) ? r.data.jobs : null;
@@ -273,7 +280,7 @@ export async function fetchBoard(fetcher: Fetcher, cache: Cache, ats: Ats, slug:
   let failure: Board | null = null;
   const { value } = await cached<Board>(cache, `board:${ats}:${slug}`, TTL_BOARD, async () => {
     const b = await readBoard(fetcher, ats, slug);
-    if (b.kind === "error") {
+    if (b.kind === "error" || (b.kind === "found" && b.departmentsError)) {
       failure = b;
       return null;
     }

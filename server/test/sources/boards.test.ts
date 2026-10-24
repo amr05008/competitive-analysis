@@ -64,7 +64,20 @@ describe("Greenhouse", () => {
     if (r.kind !== "found") throw new Error("expected a board");
     expect(r.roles).toHaveLength(20);
     expect(r.roles[0].department).toBeNull();
-    expect(r.notes?.join(" ")).toContain("departments");
+    expect(r.departmentsError).toEqual({ reason: "source_unavailable", detail: "HTTP 500" });
+  });
+});
+
+describe("a Greenhouse read that lost its departments", () => {
+  it("is never cached, so the next call asks again", async () => {
+    const cache = await freshCache();
+    const bad = fakeFetch({ [GH_JOBS]: json(ghJobs), [GH_DEPS]: { status: 500 } });
+    await fetchBoard(bad, cache, "greenhouse", "stripe");
+    const good = fakeFetch({ [GH_JOBS]: json(ghJobs), [GH_DEPS]: json(ghDepartments) });
+    const r = await fetchBoard(good, cache, "greenhouse", "stripe");
+    expect(good.calls).toEqual([GH_JOBS, GH_DEPS]);
+    expect(r.kind === "found" && r.departmentsError).toBeFalsy();
+    expect(r.kind === "found" && r.roles[0].department).not.toBeNull();
   });
 });
 
@@ -198,6 +211,18 @@ describe("fetchRoleDetail", () => {
     expect(r.ok && r.pay).toBe("USD 180,000–240,000");
   });
 
+  it("removes email addresses and phone numbers from descriptions, in every ATS", async () => {
+    const text = "Write to jane.doe+jobs@example.com or call (555) 123-4567, +44 20 7946 0958 or 415-555-0100. Posted 2026-10-24, pay 150,000-200,000.";
+    const gh = { ...ghDetail, content: `&lt;p&gt;${text}&lt;/p&gt;` };
+    const g = await fetchRoleDetail(fakeFetch({ [DETAIL]: json(gh) }), "greenhouse", "stripe", String(ghDetail.id));
+    const want = "Write to [email removed] or call [phone removed], [phone removed] or [phone removed]. Posted 2026-10-24, pay 150,000-200,000.";
+    expect(g.ok && g.description).toBe(want);
+    const a = await fetchBoard(fakeFetch({ [ASHBY]: json({ jobs: [{ ...ashby.jobs[0], descriptionPlain: text }] }) }), await freshCache(), "ashby", "hightouch");
+    expect(a.kind === "found" && a.roles[0].description).toBe(want);
+    const l = await fetchBoard(fakeFetch({ [LEVER]: json([{ ...lever[0], descriptionPlain: text }]) }), await freshCache(), "lever", "palantir");
+    expect(l.kind === "found" && l.roles[0].description).toContain(want);
+  });
+
   it("passes a failure through", async () => {
     const r = await fetchRoleDetail(fakeFetch({ [DETAIL]: { status: 404 } }), "greenhouse", "stripe", String(ghDetail.id));
     expect(r).toMatchObject({ ok: false, reason: "not_found" });
@@ -268,6 +293,22 @@ describe("findBoardLink", () => {
     expect(r.tried).toEqual(PAGES);
   });
 
+  it("treats a redirect that ends on a known board page as a link to that board", async () => {
+    const f = fakeFetch({
+      [PAGES[0]]: { status: 302, headers: { location: "https://jobs.lever.co/acme-inc" } },
+      "https://jobs.lever.co/acme-inc": "<html>no links here</html>",
+    });
+    expect(await findBoardLink(f, "acme.io")).toEqual({ found: { ats: "lever", slug: "acme-inc" }, tried: [PAGES[0]], failures: [] });
+  });
+
+  it("ignores a look-alike host", async () => {
+    const f = fakeFetch({
+      [PAGES[0]]: { status: 302, headers: { location: "https://evilacme.io/careers" } },
+      "https://evilacme.io/careers": careersAshby,
+    });
+    expect((await findBoardLink(f, "acme.io")).found).toBeNull();
+  });
+
   it("accepts a redirect to a subdomain of the company", async () => {
     const f = fakeFetch({
       [PAGES[0]]: { status: 301, headers: { location: "https://www.acme.io/careers" } },
@@ -280,6 +321,7 @@ describe("findBoardLink", () => {
     ['<a href="https://boards.greenhouse.io/acme">', { ats: "greenhouse", slug: "acme" }],
     ['<a href="https://job-boards.greenhouse.io/acme">', { ats: "greenhouse", slug: "acme" }],
     ['<iframe src="https://boards.greenhouse.io/embed/job_board?for=acme"></iframe>', { ats: "greenhouse", slug: "acme" }],
+    ['<script src="https://boards.greenhouse.io/embed/job_board/js?for=acme"></script>', { ats: "greenhouse", slug: "acme" }],
     ['<a href="https://jobs.lever.co/acme-co">', { ats: "lever", slug: "acme-co" }],
   ])("recognizes %s", async (html, expected) => {
     expect((await findBoardLink(fakeFetch({ [PAGES[0]]: html }), "acme.io")).found).toEqual(expected);
@@ -289,6 +331,7 @@ describe("findBoardLink", () => {
     const r = await findBoardLink(fakeFetch({ [PAGES[0]]: { status: 403 } }), "acme.io");
     expect(r.found).toBeNull();
     expect(r.failures).toHaveLength(1);
-    expect(r.failures[0]).toContain("403");
+    expect(r.failures[0]).toMatchObject({ url: PAGES[0], reason: "source_unavailable", status: 403 });
+    expect(r.failures[0].detail).toContain("403");
   });
 });

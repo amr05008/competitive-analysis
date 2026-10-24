@@ -17,8 +17,10 @@ const MAX_NAME_CHARS = 100;
 const MAX_TITLE_CHARS = 200;
 const MAX_LABEL_CHARS = 120;
 const MAX_DETAIL_CHARS = 200;
-/** What the budget's gate answers with once it is out of fetches or time; never a real status. */
+/** What the gate answers with once the budget or clock has run out: a status no board sends, so a refusal is told from a real failure by a typed field. */
 const REFUSED_STATUS = 599;
+/** The longest role id echoed back in a note. */
+const MAX_ECHO_CHARS = 100;
 
 /** How much of the count tables, then of each description, then of the role list is kept to fit the cap. */
 const COUNT_ROWS = [25, 10, 5];
@@ -60,14 +62,16 @@ export async function jobOpenings(
 
   // The deadline counts from here. Every request goes through the gate.
   const budget = new Budget(maxFetches, deadlineMs, deps.now);
-  const requested = new Set<string>();
-  let refused = false;
+  /** Every address checked, in order: each request the gate let through, and each board answered from the cache. */
+  const tried: string[] = [];
+  const refusedUrls = new Set<string>();
   const gate: Fetcher = (async (url: RequestInfo | URL, init?: RequestInit) => {
     if (budget.take()) {
-      requested.add(String(url));
+      tried.push(String(url));
       return deps.fetch(url, init);
     }
-    refused = true;
+    refusedUrls.add(String(url));
+    // The caller sees a failed request; the gate's own record says why.
     return new Response(null, { status: REFUSED_STATUS });
   }) as Fetcher;
   const stopNote = (): string =>
@@ -77,7 +81,12 @@ export async function jobOpenings(
 
   const notes: string[] = [];
   if (wanted.length > MAX_ROLE_IDS) notes.push(`only the first ${MAX_ROLE_IDS} role_ids were used`);
-  const tried: string[] = [];
+  let stopNoted = false;
+  /** The note for a budget or time stop, added once however many requests it refuses. */
+  const noteStop = () => {
+    if (!stopNoted) notes.push(stopNote());
+    stopNoted = true;
+  };
   const failures: string[] = [];
   const errors: { reason: ErrorReason }[] = [];
   let absent = 0;
@@ -87,15 +96,26 @@ export async function jobOpenings(
 
   type Found = Extract<Awaited<ReturnType<typeof fetchBoard>>, { kind: "found" }>;
   let board: Found | null = null;
+  let partial = false;
 
   /** One board lookup; false when the budget or the clock ran out first. */
   const tryBoard = async (ats: Ats, slug: string): Promise<boolean> => {
     if (budget.exhausted) return false;
     attempted.add(`${ats}:${slug}`);
+    const refusals = refusedUrls.size;
     const r = await fetchBoard(gate, deps.cache, ats, slug);
-    if (r.kind === "error" && refused && r.detail.includes(String(REFUSED_STATUS))) return false;
-    tried.push(r.kind === "found" ? r.apiUrl : r.url);
-    if (r.kind === "found") board = r;
+    const cut = refusedUrls.size > refusals;
+    if (r.kind === "error" && cut) return false;
+    const url = r.kind === "found" ? r.apiUrl : r.url;
+    if (!tried.includes(url)) tried.push(url); // a board answered from the cache
+    if (r.kind === "found") {
+      board = r;
+      if (r.departmentsError) {
+        partial = true;
+        if (cut) noteStop();
+        else notes.push(`the departments lookup failed (${failureText(r.departmentsError.reason, r.departmentsError.detail)}), so departments are missing`);
+      }
+    }
     else if (r.kind === "absent") absent++;
     else {
       failures.push(`${ats} board "${slug}" could not be checked (${failureText(r.reason, r.detail)})`);
@@ -117,16 +137,16 @@ export async function jobOpenings(
   if (!board && !stopped) {
     if (budget.exhausted) stopped = true;
     else {
+      const refusals = refusedUrls.size;
       const link = await findBoardLink(gate, site.domain);
-      const asked = link.tried.filter((u) => requested.has(u));
-      const careersFailures = link.failures.filter((f) => !f.endsWith(`HTTP ${REFUSED_STATUS}`));
-      tried.push(...asked);
+      const isRefusal = (f: { status?: number }) => f.status === REFUSED_STATUS && refusedUrls.size > refusals;
+      const careersFailures = link.failures.filter((f) => !isRefusal(f));
       for (const f of careersFailures) {
-        failures.push(`careers page could not be checked (${f})`);
-        errors.push({ reason: "source_unavailable" });
+        failures.push(`careers page ${f.url} could not be checked (${failureText(f.reason, f.detail)})`);
+        errors.push({ reason: f.reason });
       }
-      absent += asked.length - careersFailures.length;
-      if (refused) stopped = true;
+      absent += link.tried.length - link.failures.length;
+      if (refusedUrls.size > refusals) stopped = true;
       if (link.found && !attempted.has(`${link.found.ats}:${link.found.slug}`)) {
         if (!(await tryBoard(link.found.ats, link.found.slug))) stopped = true;
       }
@@ -135,7 +155,7 @@ export async function jobOpenings(
 
   const found = board as Found | null;
   if (!found) {
-    if (stopped) notes.push(stopNote());
+    if (stopped) noteStop();
     notes.push(...failures);
     if (!stopped && failures.length && absent === 0) {
       const first = errors[0].reason;
@@ -152,9 +172,7 @@ export async function jobOpenings(
     };
   }
 
-  notes.push(...(found.notes ?? []));
   if (failures.length) notes.push(...failures.map((f) => `${f}; the board found above was used`));
-  let partial = false;
 
   // The roles asked for by id, with descriptions; otherwise the newest.
   const all = newestFirst(found.roles);
@@ -174,19 +192,22 @@ export async function jobOpenings(
   if (roleIds.length) {
     const byId = new Map(all.map((r) => [r.id, r]));
     const missing = roleIds.filter((id) => !byId.has(id));
-    if (missing.length) notes.push(`role ${missing.join(", ")} ${missing.length === 1 ? "is" : "are"} not on the board`);
+    if (missing.length) notes.push(`role ${missing.map((id) => clip(id, MAX_ECHO_CHARS)).join(", ")} ${missing.length === 1 ? "is" : "are"} not on the board`);
     detailed = [];
     for (const r of all.filter((x) => roleIds.includes(x.id))) {
       if (budget.exhausted) {
-        notes.push(`${stopNote()}; role ${r.id} has no description`);
+        noteStop();
+        notes.push(`role ${clip(r.id, MAX_ECHO_CHARS)}: description not fetched`);
         partial = true;
         detailed.push(toRole(r));
         continue;
       }
+      const refusals = refusedUrls.size;
       const d = await fetchRoleDetail(gate, found.ats, found.slug, r.id, r);
       if (d.ok) detailed.push(toRole(r, { description: d.description, pay: d.pay ?? r.pay }));
       else {
-        notes.push(`role ${r.id}: the description could not be fetched (${failureText(d.reason, d.detail)})`);
+        if (refusedUrls.size > refusals) noteStop();
+        else notes.push(`role ${clip(r.id, MAX_ECHO_CHARS)}: the description could not be fetched (${failureText(d.reason, d.detail)})`);
         partial = true;
         detailed.push(toRole(r));
       }

@@ -55,7 +55,7 @@ const schema = z.object(jobOpeningsOutput);
 async function call(
   input: JobOpeningsInput,
   routes: Record<string, Route>,
-  opts: { now?: () => number; maxFetches?: number; deadlineMs?: number } = {},
+  opts: { now?: () => number; cache?: Cache; maxFetches?: number; deadlineMs?: number } = {},
 ): Promise<{ result: JobOpeningsResult; fetch: FakeFetch }> {
   const fetch = fakeFetch(routes);
   const { maxFetches, deadlineMs, ...rest } = opts;
@@ -158,6 +158,76 @@ describe("job_openings: finding the board", () => {
   });
 });
 
+describe("job_openings: degraded and refused reads", () => {
+  const stripe = () => ({ [gh("stripe")]: JSON.stringify(ghJobs), [ghDeps("stripe")]: JSON.stringify(ghDepartments) });
+  const ids = ghJobs.jobs.slice(0, 5).map((j) => String(j.id));
+
+  it("a failed departments lookup is partial, with a note, and is not cached", async () => {
+    const cache = await caches.open(`jobs-${crypto.randomUUID()}`);
+    const first = await call({ domain: "stripe.com" }, { ...stripe(), [ghDeps("stripe")]: { status: 500 } }, { cache });
+    expect(first.result.status).toBe("partial");
+    expect(first.result.notes.join(" ")).toMatch(/departments lookup failed.*500/);
+    expect(first.result.counts?.by_department).toEqual([{ name: "Unspecified", count: 20 }]);
+    const second = await call({ domain: "stripe.com" }, stripe(), { cache });
+    expect(second.fetch.calls).toEqual([gh("stripe"), ghDeps("stripe")]);
+    expect(second.result.status).toBe("ok");
+  });
+
+  it("a budget refusal partway through a board gives partial with the stop note, never a fake status", async () => {
+    const cache = await caches.open(`jobs-${crypto.randomUUID()}`);
+    const { result } = await call({ domain: "stripe.com" }, stripe(), { cache, maxFetches: 1 });
+    expect(result.status).toBe("partial");
+    expect(result.board?.slug).toBe("stripe");
+    expect(result.notes.join(" ")).toContain("fetch budget of 1");
+    expect(JSON.stringify(result)).not.toContain("599");
+    expect(result.notes.join(" ")).not.toContain("departments lookup failed");
+    const again = await call({ domain: "stripe.com" }, stripe(), { cache });
+    expect(again.fetch.calls).toEqual([gh("stripe"), ghDeps("stripe")]);
+    expect(again.result.status).toBe("ok");
+  });
+
+  it("valid JSON of the wrong shape is partial, never absence", async () => {
+    const { result } = await call({ domain: "acme.io" }, { [ashbyApi("acme")]: '{"unexpected":true}' });
+    expect(result.status).toBe("partial");
+    expect(result.no_public_board_found).toBe(false);
+    expect(result.notes.join(" ")).toMatch(/ashby.*unexpected response shape/);
+  });
+
+  it("the stop note appears once when the budget runs out during role details", async () => {
+    const { result } = await call({ domain: "stripe.com", role_ids: ids }, stripe(), { maxFetches: 2 });
+    expect(result.status).toBe("partial");
+    expect(result.roles).toHaveLength(5);
+    expect(result.notes.filter((n) => n.includes("fetch budget"))).toHaveLength(1);
+    expect(result.notes.filter((n) => n.includes("description not fetched"))).toHaveLength(5);
+  });
+});
+
+describe("job_openings: tried", () => {
+  it("lists departments, detail and careers requests in order, and cached boards", async () => {
+    const id = String(ghDetail.id);
+    const detail = `https://boards-api.greenhouse.io/v1/boards/stripe/jobs/${id}?pay_transparency=true`;
+    const routes = { [gh("stripe")]: JSON.stringify(ghJobs), [ghDeps("stripe")]: JSON.stringify(ghDepartments), [detail]: JSON.stringify(ghDetail) };
+    const cache = await caches.open(`jobs-${crypto.randomUUID()}`);
+    const first = await call({ domain: "stripe.com", role_ids: [id] }, routes, { cache });
+    expect(first.result.tried).toEqual([gh("stripe"), ghDeps("stripe"), detail]);
+    const second = await call({ domain: "stripe.com" }, routes, { cache });
+    expect(second.fetch.calls).toEqual([]);
+    expect(second.result.tried).toEqual([gh("stripe")]);
+  });
+
+  it("a careers path that redirects to a board page finds that board", async () => {
+    const { result } = await call(
+      { domain: "acme.io" },
+      {
+        [careers("acme.io")[0]]: { status: 302, headers: { location: "https://jobs.lever.co/acme-inc" } },
+        "https://jobs.lever.co/acme-inc": "<html></html>",
+        [leverApi("acme-inc")]: JSON.stringify([{ id: "l1", text: "Designer", hostedUrl: "https://jobs.lever.co/acme-inc/l1", createdAt: NOW, categories: {} }]),
+      },
+    );
+    expect(result.board).toEqual({ ats: "lever", slug: "acme-inc", url: "https://jobs.lever.co/acme-inc" });
+  });
+});
+
 describe("job_openings: budget", () => {
   it("returns what is done as partial when the fetch budget runs out", async () => {
     const { result, fetch } = await call({ domain: "acme.io", company_name: "Acme Labs, Inc." }, {}, { maxFetches: 2 });
@@ -251,6 +321,13 @@ describe("job_openings: roles", () => {
 });
 
 describe("job_openings: size", () => {
+  it("five 5,000-character role ids keep the result under the cap", async () => {
+    const ids = [0, 1, 2, 3, 4].map((i) => String(i).repeat(5000));
+    const { result } = await call({ domain: "acme.io", role_ids: ids }, { [ashbyApi("acme")]: JSON.stringify(ashbyBoard(60)) });
+    expect(JSON.stringify(result).length).toBeLessThanOrEqual(RESPONSE_CAP_CHARS);
+    expect(result.notes.join(" ")).toContain("not on the board");
+  });
+
   const long = (n: number) => "x".repeat(n);
   const fat = (n: number, description: string) => {
     const board = ashbyBoard(n, { description });
