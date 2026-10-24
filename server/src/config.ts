@@ -14,3 +14,10 @@ export const ARCHIVE_MAX_QUEUE = 3;
 export const ARCHIVE_COOLDOWN_MS = 120_000;
 /** How many days of usage counts are kept. */
 export const USAGE_RETENTION_DAYS = 90;
+
+/** How long a Wayback CDX index answer is cached: one day. */
+export const TTL_CDX = 86_400;
+/** How long a capture's copy fingerprint is cached: a year (a capture never changes). */
+export const TTL_FINGERPRINT = 31_536_000;
+/** The most bytes read from one archived capture. */
+export const CAPTURE_MAX_BYTES = 1_500_000;
