@@ -37,7 +37,7 @@ export class ArchiveGate {
     if (this.#coolingDown()) return Promise.resolve(this.#paused(url));
     if (this.#late(opts?.startBy, 0)) return Promise.resolve(this.#tooLate(url));
     if (this.#queued >= ARCHIVE_MAX_QUEUE) {
-      return Promise.resolve<FetchOutcome>({ ok: false, reason: "server_busy", url, detail: "archive queue full" });
+      return Promise.resolve<FetchOutcome>({ ok: false, reason: "server_busy", url, detail: "this server's archive queue is full" });
     }
     this.#queued++;
     const turn = this.#chain.then(async (): Promise<FetchOutcome> => {

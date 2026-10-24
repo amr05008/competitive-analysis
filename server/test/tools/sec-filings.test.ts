@@ -188,6 +188,19 @@ describe("sec_filings", () => {
     const { result } = await call({ company_name: "Acme" }, routes);
     expect(result.entities?.map((e) => e.exact_match)).toEqual([false, false]);
     expect(result.notes).toContain("no exact name match; these are close matches");
+    expect(result.statement).toBe("none of the companies listed is filed under exactly these names: Acme; they are close matches, not the company itself");
+    expect(renderSec(result)).toContain(result.statement!);
+  });
+
+  it("the close-match statement names every name tried", async () => {
+    const routes: Record<string, Route> = {
+      [`${SEARCH}Acme`]: searchBody([["11", "Acme Holdings Group"]]),
+      [`${SEARCH}acmehq`]: JSON.stringify(searchEmpty),
+      [subUrl("11")]: makeSub("Acme Holdings Group", "11"),
+      [formDUrl("11", "0000000011-24-000001")]: formDStripe,
+    };
+    const { result } = await call({ company_name: "Acme", domain: "acmehq.com" }, routes);
+    expect(result.statement).toBe("none of the companies listed is filed under exactly these names: Acme, acmehq; they are close matches, not the company itself");
   });
 
   it("an exact match gets no close-match note", async () => {
@@ -220,6 +233,7 @@ describe("sec_filings", () => {
     }
     const { result } = await call({ company_name: "Big" }, routes, { maxFetches: 100 });
     expect(result.entities).toHaveLength(5);
+    expect(result.notes).toContain("2 more matching companies were left out; only 5 are listed");
   });
 
   it("lists 20 filings and reads 5 Form Ds for a company", async () => {

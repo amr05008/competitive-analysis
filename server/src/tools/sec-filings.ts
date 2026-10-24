@@ -186,7 +186,11 @@ export async function secFilings(
 
   found.sort((a, b) => Number(b.stateMatch) - Number(a.stateMatch) || Number(b.exact) - Number(a.exact) || a.order - b.order);
   const kept = found.slice(0, MAX_ENTITIES);
-  if (kept.length > 0 && !kept.some((k) => k.exact)) notes.push("no exact name match; these are close matches");
+  if (found.length > kept.length) {
+    notes.push(`${plural(found.length - kept.length, "more matching company was", "more matching companies were")} left out; only ${MAX_ENTITIES} are listed`);
+  }
+  const closeOnly = kept.length > 0 && !kept.some((k) => k.exact);
+  if (closeOnly) notes.push("no exact name match; these are close matches");
 
   // 3. Form D notices, newest first, within what is left of the budget.
   let skipped = 0;
@@ -259,7 +263,11 @@ export async function secFilings(
       entities: entities
         .slice(0, entityCount)
         .map((e) => ({ ...e, filings: e.filings.slice(0, filingCount), form_d: e.form_d.slice(0, formDCount) })),
-      statement: nothing ? `no filings found under these names: ${namesTried.join(", ")}` : null,
+      statement: nothing
+        ? `no filings found under these names: ${namesTried.join(", ")}`
+        : closeOnly
+          ? `none of the companies listed is filed under exactly these names: ${namesTried.join(", ")}; they are close matches, not the company itself`
+          : null,
     };
   };
   const fits = (r: SecResult) => JSON.stringify(r).length <= RESPONSE_CAP_CHARS;

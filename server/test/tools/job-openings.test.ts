@@ -112,6 +112,42 @@ describe("job_openings: finding the board", () => {
     expect(note).toBeDefined();
   });
 
+  it("a rate-limited board says to wait a few minutes", async () => {
+    const { result } = await call({ domain: "acme.io" }, { [ashbyApi("acme")]: { status: 429 } });
+    expect(result.status).toBe("partial");
+    expect(result.notes.join(" ")).toContain("source_rate_limited");
+    expect(result.notes.join(" ")).toContain("wait a few minutes before calling again");
+    const all = Object.fromEntries([gh("acme"), ashbyApi("acme"), leverApi("acme"), ...careers("acme.io")].map((u) => [u, { status: 429 }]));
+    const error = await call({ domain: "acme.io" }, all);
+    expect(error.result.error?.reason).toBe("source_rate_limited");
+    expect(error.result.error?.detail).toContain("wait a few minutes before calling again");
+  });
+
+  it.each([
+    ["Greenhouse", '<a href="https://job-boards.eu.greenhouse.io/acmeeu">Jobs</a>', "https://job-boards.eu.greenhouse.io/acmeeu"],
+    ["Lever", '<a href="https://jobs.eu.lever.co/acmeeu">Jobs</a>', "https://jobs.eu.lever.co/acmeeu"],
+  ])("a careers link to an EU %s board is partial and unchecked, never absence", async (_ats, html, url) => {
+    const { result, fetch } = await call({ domain: "acme.io" }, { [careers("acme.io")[0]]: html });
+    expect(result.status).toBe("partial");
+    expect(result.no_public_board_found).toBe(false);
+    expect(result.board).toBeNull();
+    const note = result.notes.find((n) => n.includes("EU region"));
+    expect(note).toContain(url);
+    expect(note).toContain("wasn't checked");
+    expect(fetch.calls.some((u) => u.includes("acmeeu"))).toBe(false);
+    expect(renderJobOpenings(result)).not.toContain("no public board found");
+  });
+
+  it("a careers page that redirects to an EU Lever board is partial and unchecked too", async () => {
+    const { result } = await call(
+      { domain: "acme.io" },
+      { [careers("acme.io")[0]]: { status: 302, headers: { location: "https://jobs.eu.lever.co/acmeeu" } }, "https://jobs.eu.lever.co/acmeeu": "<html></html>" },
+    );
+    expect(result.status).toBe("partial");
+    expect(result.no_public_board_found).toBe(false);
+    expect(result.notes.join(" ")).toContain("EU region");
+  });
+
   it("a refused careers page is not absence either", async () => {
     const { result } = await call({ domain: "acme.io" }, { [careers("acme.io")[1]]: { status: 403 } });
     expect(result.status).toBe("partial");

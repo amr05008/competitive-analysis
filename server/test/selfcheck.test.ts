@@ -5,6 +5,7 @@ import { errorResult } from "../src/contract/envelope";
 import type { ToolName, ToolResult } from "../src/contract/tools";
 import type { runTool } from "../src/mcp";
 import { SCHEDULE, SELF_CHECKS, runScheduled, runSelfCheck, weeklySummary } from "../src/selfcheck";
+import { USER_AGENT } from "../src/config";
 import { postDiscord } from "../src/discord";
 
 const NOW = Date.parse("2026-10-24T06:00:00Z"); // a Saturday
@@ -243,6 +244,7 @@ describe("postDiscord", () => {
     await postDiscord(fetcher, HOOK, "hello");
     expect(seen[0]!.method).toBe("POST");
     expect(new Headers(seen[0]!.headers).get("content-type")).toBe("application/json");
+    expect(new Headers(seen[0]!.headers).get("user-agent")).toBe(USER_AGENT);
     expect(JSON.parse(String(seen[0]!.body))).toEqual({ content: "hello" });
   });
 

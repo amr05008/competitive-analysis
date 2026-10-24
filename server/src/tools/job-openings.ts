@@ -7,7 +7,7 @@ import { REFUSED_STATUS, type Fetcher } from "../shared/http";
 import { cleanCompanyName, normalizeDomain } from "../shared/inputs";
 import { limitReached } from "../shared/subrequests";
 import { fetchBoard, fetchRoleDetail, slugCandidates, type RawRole } from "../sources/boards";
-import { findBoardLink } from "../sources/careers";
+import { euBoardUrl, findBoardLink } from "../sources/careers";
 import type { ToolDeps } from ".";
 
 type Role = NonNullable<JobOpeningsResult["roles"]>[number];
@@ -103,6 +103,11 @@ export async function jobOpenings(
   };
   const failures: string[] = [];
   const errors: { reason: ErrorReason }[] = [];
+  /** Set when any source answered 429, so the result says to wait. */
+  let rateLimited = false;
+  const WAIT = "a source rate-limited the request, so wait a few minutes before calling again";
+  /** The note for a careers link to an EU-hosted board, which isn't read. */
+  let euNote: string | null = null;
   let absent = 0;
   let stopped = false;
   const attempted = new Set<string>();
@@ -126,6 +131,7 @@ export async function jobOpenings(
       board = r;
       if (r.departmentsError) {
         partial = true;
+        if (r.departmentsError.reason === "source_rate_limited") rateLimited = true;
         if (cut) noteStop();
         else notes.push(`the departments lookup failed (${failureText(r.departmentsError.reason, r.departmentsError.detail)}), so departments are missing`);
       }
@@ -134,6 +140,7 @@ export async function jobOpenings(
     else {
       failures.push(`${ats} board "${slug}" could not be checked (${failureText(r.reason, r.detail)})`);
       errors.push({ reason: r.reason });
+      if (r.reason === "source_rate_limited") rateLimited = true;
     }
     return true;
   };
@@ -158,10 +165,15 @@ export async function jobOpenings(
       for (const f of careersFailures) {
         failures.push(`careers page ${f.url} could not be checked (${failureText(f.reason, f.detail)})`);
         errors.push({ reason: f.reason });
+        if (f.reason === "source_rate_limited") rateLimited = true;
       }
       absent += link.tried.length - link.failures.length;
       if (refusedUrls.size > refusals || budget.cut) stopped = true;
-      if (link.found && !attempted.has(`${link.found.ats}:${link.found.slug}`)) {
+      if (link.found?.region === "eu") {
+        // The board is on an EU host, whose API this tool doesn't read: it exists, but wasn't checked.
+        const label = link.found.ats === "lever" ? "Lever" : "Greenhouse";
+        euNote = `the careers page links to a ${label} board hosted in the EU region, ${euBoardUrl(link.found)}, which wasn't checked`;
+      } else if (link.found && !attempted.has(`${link.found.ats}:${link.found.slug}`)) {
         if (!(await tryBoard(link.found.ats, link.found.slug))) stopped = true;
       }
     }
@@ -170,12 +182,14 @@ export async function jobOpenings(
   const found = board as Found | null;
   if (!found) {
     if (stopped) noteStop();
+    if (euNote) notes.push(euNote);
     notes.push(...failures);
-    if (!stopped && failures.length && absent === 0) {
+    if (!stopped && failures.length && absent === 0 && !euNote) {
       const first = errors[0].reason;
-      return errorResult(first, failures[0], tried, deps.now());
+      return errorResult(first, first === "source_rate_limited" ? `${failures[0]}; wait a few minutes before calling again` : failures[0], tried, deps.now());
     }
-    const complete = !stopped && failures.length === 0;
+    if (rateLimited) notes.push(WAIT);
+    const complete = !stopped && failures.length === 0 && !euNote;
     return {
       status: complete ? "ok" : "partial",
       notes,
@@ -221,13 +235,17 @@ export async function jobOpenings(
       if (d.ok) detailed.push(toRole(r, { description: d.description, pay: d.pay ?? r.pay }));
       else {
         if (refusedUrls.size > refusals || budget.cut) noteStop();
-        else notes.push(`role ${clip(r.id, MAX_ECHO_CHARS)}: the description could not be fetched (${failureText(d.reason, d.detail)})`);
+        else {
+          notes.push(`role ${clip(r.id, MAX_ECHO_CHARS)}: the description could not be fetched (${failureText(d.reason, d.detail)})`);
+          if (d.reason === "source_rate_limited") rateLimited = true;
+        }
         partial = true;
         detailed.push(toRole(r));
       }
     }
   }
 
+  if (rateLimited) notes.push(WAIT);
   const byDepartment = countBy(all, "department");
   const byLocation = countBy(all, "location");
   const status = partial ? "partial" : "ok";

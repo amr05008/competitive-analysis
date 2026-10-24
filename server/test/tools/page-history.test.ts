@@ -120,14 +120,30 @@ describe("page_history: dating changes", () => {
     const r = await call(JAN, fake);
     expect(r.status).toBe("ok");
     expect(pairs(r)).toEqual(Array.from({ length: 10 }, (_, i) => [ts(i), ts(i + 1)]));
-    expect(r.notes).toContain("9 more changes not shown; call again with a narrower range");
+    // The hidden changes start in the range's first month, so a later `from` can't reach them.
+    expect(r.notes).toContain(
+      `9 more changes not shown, dated ${[11, 12, 13, 14, 15].map(dateOf).join(", ")} and 4 more; call again with max_changes up to 15 to see more`,
+    );
+  });
+
+  it("names the hidden changes' dates and the from= that shows them", async () => {
+    // Twenty captures a month apart from 2025-01, each a different copy: nineteen changes.
+    const monthly = (i: number) => new Date(Date.UTC(2025, i, 1, 12)).toISOString().replace(/\D/g, "").slice(0, 14);
+    const rows = [EARLIEST, ...Array.from({ length: 20 }, (_, i) => ({ timestamp: monthly(i), digest: `D${i}` }))];
+    const pages = Object.fromEntries(rows.slice(1).map((r, i) => [r.timestamp, html(`Copy ${String.fromCharCode(65 + i)}`)]));
+    const r = await call({ url: PAGE, from: "2025-01", to: "2026-08" }, fakeArchive({ rows, pages }));
+    expect(r.changes).toHaveLength(10);
+    // The first hidden change is between the 2025-11 and 2025-12 captures.
+    expect(r.notes).toContain(
+      "9 more changes not shown, dated 2025-12-01, 2026-01-01, 2026-02-01, 2026-03-01, 2026-04-01 and 4 more; call again with from=2025-11 to see them",
+    );
   });
 
   it("says 1 more change, not 1 more changes", async () => {
     const fake = fakeArchive(copies((i) => `Copy ${String.fromCharCode(65 + Math.min(i, 16))}`));
     const r = await call({ ...JAN, max_changes: 15 }, fake);
     expect(r.changes).toHaveLength(15);
-    expect(r.notes).toContain("1 more change not shown; call again with a narrower range");
+    expect(r.notes).toContain(`1 more change not shown, dated ${dateOf(16)}`);
   });
 
   it("samples sixteen captures by default before it bisects", async () => {
@@ -388,6 +404,18 @@ describe("page_history: budget, deadline and failures", () => {
     expect(r.first_capture).toBeNull();
     expect(r.notes.some((n) => n.includes("archive refused") && n.includes("earliest"))).toBe(true);
     expect(pairs(r)).toEqual([[ts(12), ts(13)]]);
+  });
+
+  it("a full queue on this server is named as this server's, never as the archive refusing", async () => {
+    const fake = fakeArchive(copies((i) => (i < 13 ? "Alpha" : "Bravo")));
+    const busy: ArchiveFetch = async (url, opts) =>
+      url.includes(`/web/${ts(8)}id_/`) ? { ok: false, reason: "server_busy", url, detail: "this server's archive queue is full" } : fake(url, opts);
+    const r = await call(JAN, busy);
+    expect(r.status).toBe("partial");
+    expect(r.notes).toContain(
+      "this server's archive queue is full (server_busy), so the search stopped there without retrying; wait a few minutes before calling again",
+    );
+    expect(r.notes.join(" ")).not.toContain("archive refused");
   });
 
   it("a failed capture listing is an error with its reason", async () => {

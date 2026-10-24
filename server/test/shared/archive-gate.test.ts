@@ -92,7 +92,7 @@ describe("ArchiveGate", () => {
     const held = [h.gate.run(A), h.gate.run(B), h.gate.run(C)];
     await h.reached(1);
     const fourth = await Promise.race([h.gate.run(D), settle().then(() => "still waiting")]);
-    expect(fourth).toMatchObject({ ok: false, reason: "server_busy", url: D });
+    expect(fourth).toMatchObject({ ok: false, reason: "server_busy", url: D, detail: "this server's archive queue is full" });
     for (let i = 0; i < 3; i++) {
       await h.reached(i + 1);
       h.calls[i].respond(new Response("ok"));

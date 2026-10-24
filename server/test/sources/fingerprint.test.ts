@@ -31,6 +31,20 @@ describe("extractFingerprint", () => {
     expect((await extractFingerprint("%PDF-1.7\n1 0 obj")).readable).toBe(false);
   });
 
+  it("reads prices from the first 200,000 characters of body text only", async () => {
+    const filler = `<p>${"word ".repeat(40_000)}</p>`; // 200,000 characters of text
+    const fp = await extractFingerprint(`<title>T</title><h1>H</h1><p>Starter $10/month</p>${filler}<p>Pro $99/month</p>`);
+    expect(fp.prices.some((p) => p.includes("$10/month"))).toBe(true);
+    expect(fp.prices.some((p) => p.includes("$99/month"))).toBe(false);
+    expect(fp.headline).toBe("H");
+  });
+
+  it("still reads headings after the body-text cap", async () => {
+    const fp = await extractFingerprint(`<title>T</title><p>${"word ".repeat(50_000)}</p><h1>Late headline</h1><h2>Late section</h2>`);
+    expect(fp.headline).toBe("Late headline");
+    expect(fp.subheadings).toEqual(["Late section"]);
+  });
+
   it("reads the recorded capture", async () => {
     const fp = await extractFingerprint(capture);
     expect(fp.readable).toBe(true);

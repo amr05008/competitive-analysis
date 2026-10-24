@@ -65,6 +65,7 @@ function maxChangesOf(n: number | undefined): number {
 const TIMESTAMP = /^\d{14}$/;
 
 const dateOf = (ts: string): string => `${ts.slice(0, 4)}-${ts.slice(4, 6)}-${ts.slice(6, 8)}`;
+const monthOf = (ts: string): string => `${ts.slice(0, 4)}-${ts.slice(4, 6)}`;
 
 function msOf(ts: string): number {
   const n = (a: number, b: number) => Number(ts.slice(a, b));
@@ -261,9 +262,13 @@ function stopNote(stop: Stop, maxFetches: number, deadlineMs: number, subrequest
     case "deadline":
       return `time limit of ${Math.round(deadlineMs / 1000)} s reached; ${resume}`;
     case "refused": {
-      const busy = stop.failure.reason === "source_rate_limited" || stop.failure.reason === "server_busy";
-      const advice = busy ? "wait a few minutes before calling again" : "call again with a narrower range";
-      return `archive refused a request (${failureText(stop.failure)}); stopped there without retrying, so ${advice}`;
+      const f = stop.failure;
+      // server_busy comes from this server (its archive queue or gate), never from the archive.
+      if (f.reason === "server_busy") {
+        return `${clip(f.detail, MAX_DETAIL_CHARS)} (server_busy), so the search stopped there without retrying; wait a few minutes before calling again`;
+      }
+      const advice = f.reason === "source_rate_limited" ? "wait a few minutes before calling again" : "call again with a narrower range";
+      return `archive refused a request (${failureText(f)}); stopped there without retrying, so ${advice}`;
     }
   }
 }
@@ -322,7 +327,8 @@ export async function pageHistory(
   const earliest = await earliestCapture(indexQuery, deps.cache, page.cdxKey);
   let firstCapture: CaptureFields | null = null;
   if (!earliest.ok) {
-    notes.push(`archive refused the earliest-capture lookup (${failureText(earliest)}), so first_capture is missing`);
+    const who = earliest.reason === "server_busy" ? "this server turned away" : "archive refused";
+    notes.push(`${who} the earliest-capture lookup (${failureText(earliest)}), so first_capture is missing`);
   } else if (earliest.capture && TIMESTAMP.test(earliest.capture.timestamp)) {
     firstCapture = captureFields(earliest.capture.timestamp, page.url);
   }
@@ -381,11 +387,21 @@ export async function pageHistory(
 
   const status = search.stop || !earliest.ok || hitLimit ? "partial" : "ok";
 
+  /** The note for changes left out: their dates, and the call that shows them. */
+  const hiddenNote = (hidden: Bracket[]): string => {
+    const dates = hidden.map((b) => dateOf(captures[b.j].timestamp));
+    const more = dates.length > MAX_WIDE_LISTED ? ` and ${dates.length - MAX_WIDE_LISTED} more` : "";
+    const head = `${plural(hidden.length, "more change")} not shown, dated ${dates.slice(0, MAX_WIDE_LISTED).join(", ")}${more}`;
+    // From the month of the first hidden change's earlier capture, so the next call still brackets it.
+    const from = monthOf(captures[hidden[0].i].timestamp);
+    if (from > range.from) return `${head}; call again with from=${from} to see ${hidden.length === 1 ? "it" : "them"}`;
+    if (maxChanges < MAX_CHANGES) return `${head}; call again with max_changes up to ${MAX_CHANGES} to see more`;
+    return head;
+  };
+
   const assemble = (shown: number, level: number): PageHistoryResult => {
     const extra: string[] = [];
-    if (brackets.length > shown) {
-      extra.push(`${plural(brackets.length - shown, "more change")} not shown; call again with a narrower range`);
-    }
+    if (brackets.length > shown) extra.push(hiddenNote(brackets.slice(shown)));
     if (level > 0) extra.push("titles, headings and prices are shortened to fit the response size");
     return {
       status,

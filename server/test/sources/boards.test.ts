@@ -332,6 +332,11 @@ describe("findBoardLink", () => {
     ['<iframe src="https://boards.greenhouse.io/embed/job_board?for=acme"></iframe>', { ats: "greenhouse", slug: "acme" }],
     ['<script src="https://boards.greenhouse.io/embed/job_board/js?for=acme"></script>', { ats: "greenhouse", slug: "acme" }],
     ['<a href="https://jobs.lever.co/acme-co">', { ats: "lever", slug: "acme-co" }],
+    ['<a href="https://job-boards.eu.greenhouse.io/acme">', { ats: "greenhouse", slug: "acme", region: "eu" }],
+    ['<a href="https://boards.eu.greenhouse.io/acme">', { ats: "greenhouse", slug: "acme", region: "eu" }],
+    ['<iframe src="https://boards.eu.greenhouse.io/embed/job_board?for=acme"></iframe>', { ats: "greenhouse", slug: "acme", region: "eu" }],
+    ['<a href="https://jobs.eu.lever.co/acme-co">', { ats: "lever", slug: "acme-co", region: "eu" }],
+    ['<iframe src="https://boards.greenhouse.io/embed/job_board?x=a.eu.b&for=acme"></iframe>', { ats: "greenhouse", slug: "acme" }],
   ])("recognizes %s", async (html, expected) => {
     expect((await findBoardLink(fakeFetch({ [PAGES[0]]: html }), "acme.io")).found).toEqual(expected);
   });

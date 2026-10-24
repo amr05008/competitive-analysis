@@ -289,7 +289,7 @@ export const secOutput = {
     .string()
     .nullable()
     .optional()
-    .describe("A plain statement when nothing is filed under the names tried, otherwise null."),
+    .describe("A plain statement when nothing is filed under the names tried, or when the companies listed are only close matches, otherwise null."),
 };
 
 // ----------------------------------------------------------------------- types

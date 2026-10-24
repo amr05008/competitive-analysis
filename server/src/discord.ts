@@ -1,8 +1,10 @@
+import { USER_AGENT } from "./config";
+
 /** Discord rejects messages over 2,000 characters; stay under with room to spare. */
 export const DISCORD_MAX_CHARS = 1900;
 
 /**
- * Posts `content` to a Discord webhook. Never throws: a non-2xx answer or a
+ * Posts `content` to a Discord webhook, with the server's user agent. Never throws: a non-2xx answer or a
  * thrown fetch is dropped. With no webhook it logs one warning, which holds no
  * inputs and no URLs.
  */
@@ -19,7 +21,7 @@ export async function postDiscord(
   try {
     const res = await fetcher(webhookUrl, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "user-agent": USER_AGENT },
       body: JSON.stringify({ content: text }),
     });
     await res.body?.cancel();

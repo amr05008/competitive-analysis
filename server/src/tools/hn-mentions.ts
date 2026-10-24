@@ -74,6 +74,7 @@ export async function hackerNewsMentions(
     }
   };
   const failText = (f: FailedOutcome) => `${f.reason}: ${clip(f.detail, MAX_DETAIL_CHARS)}`;
+  const wait = (f: FailedOutcome) => (f.reason === "source_rate_limited" ? "; wait a few minutes before calling again" : "");
 
   const now = deps.now();
   const thisYear = new Date(now).getUTCFullYear();
@@ -116,13 +117,13 @@ export async function hackerNewsMentions(
   }
 
   if (stop?.kind === "failed" && years.length === 0) {
-    return errorResult(stop.failure.reason, stop.failure.detail, tried, deps.now());
+    return errorResult(stop.failure.reason, `${stop.failure.detail}${wait(stop.failure)}`, tried, deps.now());
   }
 
   if (stop) {
     const done = years.length ? `years ${years[0].year} to ${years[years.length - 1].year} are shown` : "no year was counted";
     if (stop.kind === "limit") notes.push(stopNote(`the counts stop here (${done})`));
-    else notes.push(`a request failed (${failText(stop.failure)}), so the counts stop here (${done})`);
+    else notes.push(`a request failed (${failText(stop.failure)}), so the counts stop here (${done})${wait(stop.failure)}`);
   }
   if (years.some((y) => y.year === thisYear)) notes.push(`${thisYear} is counted to date`);
 
@@ -147,7 +148,7 @@ export async function hackerNewsMentions(
           story_link: h.url,
         }));
       } else if (refusals > before || budget.cut) notes.push(stopNote("the top threads were not checked"));
-      else notes.push(`the top threads could not be fetched (${failText(r)})`);
+      else notes.push(`the top threads could not be fetched (${failText(r)})${wait(r)}`);
     }
   } else notes.push("the top threads were not checked");
 

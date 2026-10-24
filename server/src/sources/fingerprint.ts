@@ -12,6 +12,8 @@ const PRICE =
   /[$€£]\s?\d[\d,]*(?:\.\d{1,2})?(?:\s?[kKmM])?(?:\s?(?:\/|per)\s?(?:month|mo|year|yr|user|seat|member))?/gi;
 const MAX_SUBHEADINGS = 3;
 const MAX_PRICES = 8;
+/** Prices are read from this much of a page's body text: a long page's pricing comes early, and the rest costs CPU. */
+const BODY_MAX_CHARS = 200_000;
 
 const ENTITIES: Record<string, string> = {
   amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
@@ -115,16 +117,20 @@ export async function extractFingerprint(html: string): Promise<Fingerprint> {
     .on("*", {
       text(t) {
         if (skip) return;
-        body += t.text;
-        if (heading) heading.text += t.text;
-        if (t.lastInTextNode) {
-          body += " ";
-          if (heading) heading.text += " ";
-        }
+        const end = t.lastInTextNode ? " " : "";
+        if (body.length < BODY_MAX_CHARS) body += t.text + end;
+        if (heading) heading.text += t.text + end;
       },
     });
 
-  await rewriter.transform(new Response(html)).text();
+  // Only the handlers' side effects are wanted, so the output is drained without being kept or decoded.
+  const reader = rewriter.transform(new Response(html)).body?.getReader();
+  if (reader) {
+    for (;;) {
+      const { done } = await reader.read();
+      if (done) break;
+    }
+  }
 
   const fp = {
     title: squash(title, 200),

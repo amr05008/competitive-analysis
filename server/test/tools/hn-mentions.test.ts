@@ -133,8 +133,16 @@ describe("hacker_news_mentions", () => {
     expect(result.status).toBe("partial");
     expect(result.years?.map((y) => y.year)).toEqual([2021, 2022, 2023]);
     expect(result.notes.join(" ")).toContain("source_rate_limited");
+    expect(result.notes.join(" ")).toContain("wait a few minutes before calling again");
     expect(result.top_threads).toBeUndefined();
     expect(fetch.calls).not.toContain(storiesUrl("Hightouch", 2025));
+  });
+
+  it("a 429 on the very first request is an error that says to wait", async () => {
+    const { result } = await call({ query: "Hightouch" }, { [storiesUrl("Hightouch", 2021)]: { status: 429 } });
+    expect(result.status).toBe("error");
+    expect(result.error?.reason).toBe("source_rate_limited");
+    expect(result.error?.detail).toContain("wait a few minutes before calling again");
   });
 
   it("returns an error when the very first request fails", async () => {
