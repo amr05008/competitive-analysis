@@ -1,5 +1,6 @@
 import type { ErrorReason } from "../contract/envelope";
 import { USER_AGENT } from "../config";
+import { isPublicHost } from "./inputs";
 
 export type Fetcher = typeof fetch;
 
@@ -16,6 +17,15 @@ export type ArchiveFetch = (
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_BYTES = 2_000_000;
+const MAX_REDIRECTS = 5;
+
+async function dropBody(res: Response): Promise<void> {
+  try {
+    await res.body?.cancel();
+  } catch {
+    // a failed cancel must not mask the status
+  }
+}
 
 /** One GET with our user agent, a timeout and a body cap; failures come back as values, never throws. */
 export async function politeFetch(
@@ -27,6 +37,7 @@ export async function politeFetch(
   const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BYTES;
   const controller = new AbortController();
   let timedOut = false;
+  let finalUrl = url;
   const timer = setTimeout(() => {
     timedOut = true;
     controller.abort();
@@ -34,28 +45,46 @@ export async function politeFetch(
   const fail = (reason: ErrorReason, detail: string, status?: number): FetchOutcome => ({
     ok: false,
     reason,
-    url,
+    url: finalUrl,
     detail,
     ...(status === undefined ? {} : { status }),
   });
   try {
     const headers: Record<string, string> = { "user-agent": USER_AGENT };
     if (opts.accept) headers.accept = opts.accept;
-    const res = await fetcher(url, { headers, signal: controller.signal, redirect: "follow" });
+    let current = url;
+    let res: Response;
+    for (let hops = 0; ; hops++) {
+      res = await fetcher(current, { headers, signal: controller.signal, redirect: "manual" });
+      if (res.status < 300 || res.status >= 400 || !res.headers.get("location")) break;
+      await dropBody(res);
+      if (hops >= MAX_REDIRECTS) return fail("source_unavailable", "too many redirects");
+      let next: URL;
+      try {
+        next = new URL(res.headers.get("location") as string, current);
+      } catch {
+        return fail("source_unavailable", "redirect to an invalid location");
+      }
+      if ((next.protocol !== "http:" && next.protocol !== "https:") || !isPublicHost(next.hostname)) {
+        return fail("source_unavailable", `redirect to a disallowed host: ${next.hostname}`);
+      }
+      current = next.toString();
+    }
+    finalUrl = current;
     if (res.status === 429) {
-      await res.body?.cancel();
+      await dropBody(res);
       return fail("source_rate_limited", "HTTP 429", 429);
     }
     if (res.status === 404) {
-      await res.body?.cancel();
+      await dropBody(res);
       return fail("not_found", "HTTP 404", 404);
     }
     if (!res.ok) {
-      await res.body?.cancel();
+      await dropBody(res);
       return fail("source_unavailable", `HTTP ${res.status}`, res.status);
     }
     const { text, truncated } = await readCapped(res, maxBytes);
-    return { ok: true, status: res.status, url, text, truncated };
+    return { ok: true, status: res.status, url: finalUrl, text, truncated };
   } catch (e) {
     if (timedOut) return fail("source_unavailable", `timeout after ${timeoutMs} ms`);
     return fail("source_unavailable", `connection failed (${e instanceof Error ? e.name : "error"})`);

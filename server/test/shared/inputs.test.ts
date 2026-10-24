@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cleanCompanyName, normalizeDomain, normalizePageUrl } from "../../src/shared/inputs";
 
-const BAD = ["127.0.0.1", "http://10.0.0.5/", "localhost:8787", "[::1]", "https://user:pw@x.com", "x.com:8443", "ftp://x.com", "intranet", ""];
+const BAD = ["127.0.0.1", "http://10.0.0.5/", "localhost:8787", "[::1]", "https://user:pw@x.com", "x.com:8443", "ftp://x.com", "intranet", "", "2130706433", "0x7f.0.0.1", "[::ffff:127.0.0.1]", "localhost", "localhost.", "localhost..", "http://localhost../", "127.0.0.1..", "x.internal..", "a.local.."];
 
 describe("normalizePageUrl", () => {
   it.each(["hightouch.com/pricing", "https://www.hightouch.com/pricing/", "HTTP://Hightouch.com/pricing?ref=x#top"])("normalizes %s", (s) => {

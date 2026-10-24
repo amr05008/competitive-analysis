@@ -52,4 +52,45 @@ describe("politeFetch", () => {
     const r = await politeFetch(respond("a".repeat(100)), "https://a.com/", { maxBytes: 10 });
     expect(r).toMatchObject({ ok: true, truncated: true, text: "a".repeat(10) });
   });
+
+  const redirect = (to: string, status = 302) => new Response(null, { status, headers: { location: to } });
+
+  it("follows a redirect to a public host and reports the final url", async () => {
+    const f = (async (u: RequestInfo | URL) =>
+      String(u) === "https://a.com/" ? redirect("https://b.com/x") : new Response("ok")) as typeof fetch;
+    expect(await politeFetch(f, "https://a.com/")).toMatchObject({ ok: true, url: "https://b.com/x", text: "ok" });
+  });
+
+  it("resolves a relative Location", async () => {
+    const f = (async (u: RequestInfo | URL) =>
+      String(u) === "https://a.com/p/q" ? redirect("../z") : new Response("ok")) as typeof fetch;
+    expect(await politeFetch(f, "https://a.com/p/q")).toMatchObject({ ok: true, url: "https://a.com/z" });
+  });
+
+  it.each(["http://127.0.0.1/", "http://localhost/", "https://localhost../", "ftp://b.com/"])("refuses a redirect to %s", async (to) => {
+    const r = await politeFetch((async () => redirect(to)) as typeof fetch, "https://a.com/");
+    expect(r).toMatchObject({ ok: false, reason: "source_unavailable" });
+    expect((r as { detail: string }).detail).toContain("redirect to a disallowed host");
+  });
+
+  it("refuses a sixth redirect", async () => {
+    let n = 0;
+    const f = (async () => redirect(`https://a.com/${++n}`)) as typeof fetch;
+    const r = await politeFetch(f, "https://a.com/");
+    expect(r).toMatchObject({ ok: false, detail: "too many redirects" });
+    expect(n).toBe(6);
+  });
+
+  it("allows exactly five redirects", async () => {
+    let n = 0;
+    const f = (async () => (n++ < 5 ? redirect(`https://a.com/${n}`) : new Response("ok"))) as typeof fetch;
+    expect(await politeFetch(f, "https://a.com/")).toMatchObject({ ok: true, url: "https://a.com/5" });
+  });
+
+  it("keeps the status when body cancel rejects", async () => {
+    const res = new Response("x", { status: 503 });
+    Object.defineProperty(res, "body", { value: { cancel: () => Promise.reject(new Error("no")) } });
+    const r = await politeFetch((async () => res) as typeof fetch, "https://a.com/");
+    expect(r).toMatchObject({ ok: false, status: 503 });
+  });
 });
