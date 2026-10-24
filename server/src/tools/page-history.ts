@@ -137,6 +137,11 @@ async function findChanges(
     if (state.stop) return false;
     if (reads[i] !== undefined) return true;
     const r = await fingerprintAt(gated, cache, captures[i].timestamp, url);
+    if (!r.ok && r.reason === "not_found" && !state.stop) {
+      // The index listed a capture the archive can't serve: skip it like an unreadable one.
+      reads[i] = "unreadable";
+      return true;
+    }
     if (!r.ok) {
       state.stop ??= { kind: "refused", failure: r };
       return false;
@@ -181,9 +186,10 @@ async function findChanges(
     pending.unshift(...split);
   }
 
+  // A bracket left over after a stop may still have nothing unread inside it.
   return {
     reads,
-    brackets: [...done, ...pending.map(([i, j]) => ({ i, j, resolved: false }))],
+    brackets: [...done, ...pending.map(([i, j]) => ({ i, j, resolved: middle(reads, i, j) === null }))],
     stop: state.stop,
     sampledThrough: sampled < samples.length ? (sampled ? samples[sampled - 1] : -1) : null,
   };
@@ -221,8 +227,11 @@ function stopNote(stop: Stop, maxFetches: number, deadlineMs: number): string {
       return `fetch budget of ${maxFetches} captures used up; ${resume}`;
     case "deadline":
       return `time limit of ${Math.round(deadlineMs / 1000)} s reached; ${resume}`;
-    case "refused":
-      return `archive refused a request (${failureText(stop.failure)}); stopped there without retrying, so wait a few minutes before calling again`;
+    case "refused": {
+      const busy = stop.failure.reason === "source_rate_limited" || stop.failure.reason === "server_busy";
+      const advice = busy ? "wait a few minutes before calling again" : "call again with a narrower range";
+      return `archive refused a request (${failureText(stop.failure)}); stopped there without retrying, so ${advice}`;
+    }
   }
 }
 
@@ -272,7 +281,8 @@ export async function pageHistory(
   );
   if (!listed.ok) return errorResult(listed.reason, listed.detail, [listed.url], deps.now());
   const captures = distinct(listed.captures);
-  if (listed.captures.length >= CDX_LIMIT) {
+  const hitLimit = listed.captures.length >= CDX_LIMIT;
+  if (hitLimit) {
     notes.push(
       `the archive index returned its limit of ${CDX_LIMIT} captures, so later ones in the range are missing; call again with a narrower range`,
     );
@@ -292,7 +302,9 @@ export async function pageHistory(
   }
   const unreadable = search.reads.filter((r) => r === "unreadable").length;
   if (unreadable) {
-    notes.push(`${plural(unreadable, "capture")} had no readable copy, such as a page drawn by scripts, and never count as a change`);
+    notes.push(
+      `${plural(unreadable, "capture")} had no readable copy, such as a page drawn by scripts or one the archive couldn't serve, and never count as a change`,
+    );
   }
 
   const brackets = [...search.brackets].sort((a, b) =>
@@ -312,12 +324,12 @@ export async function pageHistory(
     notes.push(`the ${one ? "change" : "changes"} dated ${dates} ${one ? "is" : "are"} in the meta description only, which isn't returned`);
   }
 
-  const status = search.stop || !earliest.ok ? "partial" : "ok";
+  const status = search.stop || !earliest.ok || hitLimit ? "partial" : "ok";
 
   const assemble = (shown: number, level: number): PageHistoryResult => {
     const extra: string[] = [];
     if (brackets.length > shown) {
-      extra.push(`${brackets.length - shown} more changes not shown; call again with a narrower range`);
+      extra.push(`${plural(brackets.length - shown, "more change")} not shown; call again with a narrower range`);
     }
     if (level > 0) extra.push("titles, headings and prices are shortened to fit the response size");
     return {
@@ -376,7 +388,7 @@ function changeLine(c: Change): string {
   return `- between ${c.before.date} and ${c.after.date} (${days}): ${what}. ${c.before.link} → ${c.after.link}`;
 }
 
-/** The short text that goes with a page_history result: a header, one line per change, then the notes. */
+/** The short text that goes with a page_history result: a header, the notes, then one line per change. */
 export function renderPageHistory(r: PageHistoryResult): string {
   if (r.status === "error") {
     const e = r.error;
@@ -386,12 +398,13 @@ export function renderPageHistory(r: PageHistoryResult): string {
   }
   const changes = r.changes ?? [];
   const first = r.first_capture;
+  // Notes come right after the header, so the render cap can only cut change lines.
   const lines = [
     `Page history of ${r.url} from ${r.range?.from} to ${r.range?.to} (${r.status})`,
+    ...r.notes.map((n) => `note: ${n}`),
     first ? `first captured ${first.date}: ${first.link}` : "first capture: unknown",
     `${plural(r.captures_in_range ?? 0, "capture")} in range, ${plural(changes.length, "change")} shown, ${plural(r.fetches_used ?? 0, "archive request")}`,
     ...changes.map(changeLine),
-    ...r.notes.map((n) => `note: ${n}`),
   ];
   return lines.join("\n");
 }

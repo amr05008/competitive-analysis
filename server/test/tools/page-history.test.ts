@@ -22,12 +22,12 @@ const html = (copy: string) =>
   `<!doctype html><html><head><title>${copy} | Example</title><meta name="description" content="All about ${copy}"></head>` +
   `<body><h1>Plans for ${copy}</h1><h2>${copy} features</h2><p>Team plan for ${copy} costs $${copy.length * 10}/month</p></body></html>`;
 
-/** Twenty captures in January 2025 with page HTML `pageAt(i)`, after the EARLIEST one. */
-function site(pageAt: (i: number) => string): { rows: CaptureRow[]; pages: Record<string, string> } {
-  const inRange = Array.from({ length: 20 }, (_, i) => ({ timestamp: ts(i), digest: `D${i}` }));
+/** `n` captures (twenty unless given) in January 2025 with page HTML `pageAt(i)`, after the EARLIEST one. */
+function site(pageAt: (i: number) => string, n = 20): { rows: CaptureRow[]; pages: Record<string, string> } {
+  const inRange = Array.from({ length: n }, (_, i) => ({ timestamp: ts(i), digest: `D${i}` }));
   return { rows: [EARLIEST, ...inRange], pages: Object.fromEntries(inRange.map((r, i) => [r.timestamp, pageAt(i)])) };
 }
-const copies = (copyAt: (i: number) => string) => site((i) => html(copyAt(i)));
+const copies = (copyAt: (i: number) => string, n = 20) => site((i) => html(copyAt(i)), n);
 
 async function depsFor(archive: ArchiveFetch, opts: { cache?: Cache; now?: () => number } = {}): Promise<ToolDeps> {
   return {
@@ -108,6 +108,25 @@ describe("page_history: dating changes", () => {
     expect(r.notes).toContain("9 more changes not shown; call again with a narrower range");
   });
 
+  it("says 1 more change, not 1 more changes", async () => {
+    const fake = fakeArchive(copies((i) => `Copy ${String.fromCharCode(65 + Math.min(i, 16))}`));
+    const r = await call({ ...JAN, max_changes: 15 }, fake);
+    expect(r.changes).toHaveLength(15);
+    expect(r.notes).toContain("1 more change not shown; call again with a narrower range");
+  });
+
+  it("works on the earliest bracket first", async () => {
+    // Brackets (0,3) and (16,19) after sampling. Earliest first, two more fetches pin
+    // the first change and the budget runs out on the second; latest first would do the reverse.
+    const fake = fakeArchive(copies((i) => (i < 2 ? "Alpha" : i < 17 ? "Bravo" : "Charlie")));
+    const r = await call(JAN, fake, { maxFetches: 10 });
+    expect(r.status).toBe("partial");
+    expect(r.changes!.map((c) => [c.before.timestamp, c.after.timestamp, c.resolved])).toEqual([
+      [ts(1), ts(2), true],
+      [ts(16), ts(19), false],
+    ]);
+  });
+
   it("days_between counts whole days, rounded down", async () => {
     const rows = [
       { timestamp: "20250101230000", digest: "A" },
@@ -149,13 +168,65 @@ describe("page_history: budget, deadline and failures", () => {
     const fake = fakeArchive({ ...copies((i) => (i < 2 ? "Alpha" : "Bravo")), failAt: 5 });
     const r = await call(JAN, fake);
     expect(r.status).toBe("partial");
-    expect(r.notes.some((n) => n.includes("archive refused") && n.includes("source_rate_limited"))).toBe(true);
+    expect(
+      r.notes.some(
+        (n) => n.includes("archive refused") && n.includes("source_rate_limited") && n.includes("wait a few minutes"),
+      ),
+    ).toBe(true);
     expect(fake.calls).toHaveLength(5);
     expect(r.fetches_used).toBe(5);
     // Samples 0 and 3 were read before the refusal; their change stays wide.
     expect(pairs(r)).toEqual([[ts(0), ts(3)]]);
     expect(r.changes![0].resolved).toBe(false);
     expect(r.first_capture?.timestamp).toBe(EARLIEST.timestamp);
+  });
+
+  it("after a stop, a bracket with nothing unread inside is still resolved", async () => {
+    // Six captures, all sampled; the fifth capture fetch (call 7) fails after A,A,B,B are read.
+    const fake = fakeArchive({ ...copies((i) => ["Alpha", "Alpha", "Bravo", "Bravo", "Charlie", "Charlie"][i], 6), failAt: 7 });
+    const r = await call(JAN, fake);
+    expect(r.status).toBe("partial");
+    expect(r.changes!.map((c) => [c.before.timestamp, c.after.timestamp, c.resolved])).toEqual([[ts(1), ts(2), true]]);
+    expect(r.notes.some((n) => n.includes("still wide"))).toBe(false);
+    expect(fake.calls).toHaveLength(7);
+  });
+
+  it("a capture the archive answers 404 for is skipped, and the change is still pinned", async () => {
+    const data = copies((i) => (i < 13 ? "Alpha" : "Bravo"));
+    delete data.pages[ts(12)];
+    const fake = fakeArchive(data);
+    const r = await call(JAN, fake);
+    expect(r.status).toBe("ok");
+    expect(r.changes!.map((c) => [c.before.timestamp, c.after.timestamp, c.resolved])).toEqual([[ts(11), ts(13), true]]);
+    expect(fake.calls.some((u) => u.includes(`/web/${ts(12)}id_/`))).toBe(true);
+  });
+
+  it("any other capture failure stops the call, and suggests a narrower range", async () => {
+    const fake = fakeArchive(copies(() => "Alpha"));
+    const flaky: ArchiveFetch = async (url, opts) => {
+      const out = await fake(url, opts);
+      return url.includes(`/web/${ts(5)}id_/`)
+        ? { ok: false, reason: "source_unavailable", status: 500, url, detail: "HTTP 500" }
+        : out;
+    };
+    const r = await call(JAN, flaky);
+    expect(r.status).toBe("partial");
+    const note = r.notes.find((n) => n.includes("archive refused"));
+    expect(note).toContain("source_unavailable");
+    expect(note).toContain("narrower range");
+    expect(note).not.toContain("wait a few minutes");
+    // Two index queries, samples 0 and 3, then the failed sample 5, never retried.
+    expect(fake.calls).toHaveLength(5);
+  });
+
+  it("an index answer at its row limit is partial", async () => {
+    const stamp = (i: number) => new Date(Date.UTC(2025, 0, 1) + i * 60_000).toISOString().replace(/\D/g, "").slice(0, 14);
+    const rows = Array.from({ length: 2000 }, (_, i) => ({ timestamp: stamp(i), digest: `D${i}` }));
+    const pages = Object.fromEntries(rows.map((r) => [r.timestamp, html("Alpha")]));
+    const r = await call(JAN, fakeArchive({ rows, pages }));
+    expect(r.captures_in_range).toBe(2000);
+    expect(r.status).toBe("partial");
+    expect(r.notes.some((n) => n.includes("limit of 2000"))).toBe(true);
   });
 
   it("stops at the deadline, checked before each capture fetch", async () => {
@@ -210,6 +281,15 @@ describe("page_history: unreadable captures", () => {
     expect(r.status).toBe("ok");
     expect(r.changes).toEqual([]);
     expect(fake.calls.some((u) => u.includes(ts(5)))).toBe(true);
+  });
+
+  it("when every capture from the middle to j is unreadable, the search turns toward i", async () => {
+    // Samples 3 and 5 are unreadable, so the bracket is (0,8); 4, 6 and 7 are unreadable too.
+    const page = (i: number) =>
+      i >= 3 && i <= 7 ? `<div id="root"></div>` : html(i < 2 ? "Alpha" : "Bravo");
+    const r = await call(JAN, fakeArchive(site(page)));
+    expect(r.status).toBe("ok");
+    expect(r.changes!.map((c) => [c.before.timestamp, c.after.timestamp, c.resolved])).toEqual([[ts(1), ts(2), true]]);
   });
 
   it("an unreadable capture inside a bracket is stepped over", async () => {
@@ -338,6 +418,9 @@ describe("page_history: output", () => {
     expect(text.endsWith(`\n${MORE_LINE}`)).toBe(true);
     const kept = text.slice(0, -MORE_LINE.length - 1);
     expect(full.startsWith(`${kept}\n`)).toBe(true);
+    // The notes come before the change lines, so the cap keeps them.
+    for (const n of r.notes) expect(text).toContain(`note: ${n}`);
+    expect(text.indexOf("note: ")).toBeLessThan(text.indexOf("- between "));
   });
 
   it("a short render is unchanged", async () => {
