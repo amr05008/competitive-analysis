@@ -108,6 +108,7 @@ describe("sec_filings", () => {
     const { result } = await call({ company_name: "Stripe" }, stripeRoutes());
     const text = JSON.stringify(result) + render("sec_filings", result);
     expect(text).not.toMatch(/Person|Berry|Oyster|298-5539/);
+    expect(result.entities?.[0]).not.toHaveProperty("ein");
   });
 
   it("drops individual filers", async () => {
@@ -264,12 +265,19 @@ describe("sec_filings", () => {
     expect(result.error?.tried).toEqual([`${SEARCH}Acme`]);
   });
 
+  it("a 429 on the only search is an error that says to wait", async () => {
+    const { result } = await call({ company_name: "Acme" }, { [`${SEARCH}Acme`]: { status: 429 } });
+    expect(result.status).toBe("error");
+    expect(result.error?.reason).toBe("source_rate_limited");
+    expect(result.error?.detail).toContain("wait a few minutes before calling again");
+  });
+
   it("a failed Form D read keeps the entity and says so", async () => {
     const routes = stripeRoutes();
     routes[STRIPE_D] = { status: 503 };
     const { result } = await call({ company_name: "Stripe" }, routes);
     expect(result.status).toBe("partial");
-    expect(result.entities?.[0].form_d).toHaveLength(4); // 5 read, the failed one left out
+    expect(result.entities?.[0].form_d).toHaveLength(4); // 4 read of the 5 attempted; the failed one is left out
     expect(result.notes.join(" ")).toMatch(/Form D/);
   });
 
@@ -296,6 +304,22 @@ describe("sec_filings", () => {
     expect(fetch.calls).toContain(subUrl("1326801"));
     expect(result.entities?.map((e) => e.name)).toEqual(["Facebook, Inc."]);
     expect(result.entities?.[0].exact_match).toBe(true);
+  });
+
+  it("an exact hit late in the second search's list is still checked first", async () => {
+    const first = Array.from({ length: 10 }, (_, i) => [String(500 + i), `Meta Thing ${i}`] as [string, string]);
+    const second: [string, string][] = Array.from({ length: 6 }, (_, i) => [String(700 + i), `Faceplate ${i}`]);
+    second[5] = ["1326801", "Facebook, Inc."];
+    const routes: Record<string, Route> = {
+      [`${SEARCH}Meta`]: searchBody(first),
+      [`${SEARCH}facebook`]: searchBody(second),
+      [subUrl("1326801")]: makeSub("Facebook, Inc.", "1326801", {}, ["8-K"]),
+    };
+    for (const [cik, name] of [...first, ...second]) if (!routes[subUrl(cik)]) routes[subUrl(cik)] = makeSub(name, cik, {}, ["4"]);
+    const { result, fetch } = await call({ company_name: "Meta", domain: "facebook.com" }, routes, { maxFetches: 40 });
+    // interleaving alone would reach only index 3 of the second list within 8 candidates
+    expect(fetch.calls.indexOf(subUrl("1326801"))).toBe(3); // right after the two searches
+    expect(result.entities?.map((e) => e.name)).toEqual(["Facebook, Inc."]);
   });
 
   it("unchecked hits suppress the no-filings statement", async () => {

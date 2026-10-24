@@ -10,7 +10,7 @@ import { cleanCompanyName } from "../shared/inputs";
 export const COMPANY_FORMS = new Set([
   "D", "D/A", "S-1", "S-1/A", "F-1", "10-K", "10-K/A", "10-Q", "10-Q/A", "8-K", "8-K/A", "20-F", "40-F", "6-K",
   "10-12B", "10-12G", "C", "C/A", "C-U", "C-AR", "1-A", "1-A/A", "1-K", "1-SA", "1-U",
-  "13F-HR", "13F-HR/A", "N-CSR", "N-PORT-P", "DEF 14A", "424B4",
+  "N-CSR", "N-PORT-P", "DEF 14A", "424B4",
 ]);
 
 /** The industry groups a Form D can name. Any other value is treated as absent. */
@@ -40,7 +40,6 @@ export type Submissions = {
   stateOfIncorporation: string | null;
   businessState: string | null;
   formerNames: string[];
-  ownerOnly: boolean;
   filings: Filing[];
 };
 
@@ -129,7 +128,10 @@ const stateOf = (v: unknown): string | null => {
   return s ? s : null;
 };
 
-function parseSubmissions(text: string): Submissions | null {
+/** What is cached for an entity that is not a listable company: no name, no forms. */
+type NotListable = { listable: false };
+
+function parseSubmissions(text: string): Submissions | NotListable | null {
   const body = parseJson(text);
   if (!body) return null;
   const cik = str(body.cik);
@@ -152,26 +154,27 @@ function parseSubmissions(text: string): Submissions | null {
   const former = Array.isArray(body.formerNames)
     ? body.formerNames.map((f) => str(obj(f)?.name)).filter((n): n is string => !!n).map((n) => n.slice(0, MAX_NAME_CHARS))
     : [];
-  return {
+  const sub: Submissions = {
     cik: cik.replace(/^0+(?=\d)/, ""),
     name: name.slice(0, MAX_NAME_CHARS),
     stateOfIncorporation: stateOf(body.stateOfIncorporation),
     businessState: stateOf(obj(obj(body.addresses)?.business)?.stateOrCountry),
     formerNames: former,
-    ownerOnly: body.insiderTransactionForOwnerExists === 1,
     filings,
   };
+  // Decided before anything is cached: an individual's record is stored as a bare sentinel.
+  return isListableCompany(sub) ? sub : { listable: false };
 }
 
-/** One company's submissions record, reduced to the allow-listed fields. */
+/** One company's submissions record, reduced to the allow-listed fields; sub is null when the entity is not a listable company, and only a bare sentinel is cached for it. */
 export async function getSubmissions(
   fetcher: Fetcher,
   cache: Cache,
   cik: string,
-): Promise<{ ok: true; sub: Submissions } | FailedOutcome> {
+): Promise<{ ok: true; sub: Submissions | null } | FailedOutcome> {
   const url = `https://data.sec.gov/submissions/CIK${cik.padStart(10, "0")}.json`;
   const r = await fetchParsed(fetcher, cache, url, 3_000_000, parseSubmissions, "submissions");
-  return r.ok ? { ok: true, sub: r.value } : r;
+  return r.ok ? { ok: true, sub: "listable" in r.value ? null : r.value } : r;
 }
 
 // ------------------------------------------------------------------- Form D

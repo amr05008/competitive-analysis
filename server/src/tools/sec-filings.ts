@@ -8,7 +8,6 @@ import {
   filingFolder,
   getFormD,
   getSubmissions,
-  isListableCompany,
   normalizeEntityName,
   searchEntities,
   type Submissions,
@@ -113,7 +112,10 @@ export async function secFilings(
     lists.push(r.hits);
   }
   if (searchesOk === 0) {
-    if (firstSearchFailure) return errorResult(firstSearchFailure.reason, firstSearchFailure.detail, tried, deps.now());
+    if (firstSearchFailure) {
+      const wait = firstSearchFailure.reason === "source_rate_limited" ? "; wait a few minutes before calling again" : "";
+      return errorResult(firstSearchFailure.reason, `${firstSearchFailure.detail}${wait}`, tried, deps.now());
+    }
     return errorResult("source_unavailable", `${stopReason()} before any search`, tried, deps.now());
   }
 
@@ -153,7 +155,7 @@ export async function secFilings(
       }
       continue;
     }
-    if (!isListableCompany(r.sub)) continue;
+    if (r.sub === null) continue;
     found.push({
       sub: r.sub,
       exact: wanted.has(normalizeEntityName(r.sub.name)),

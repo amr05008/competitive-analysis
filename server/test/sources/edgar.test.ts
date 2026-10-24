@@ -18,7 +18,6 @@ const sub = (over: Partial<Submissions>): Submissions => ({
   stateOfIncorporation: null,
   businessState: null,
   formerNames: [],
-  ownerOnly: false,
   filings: [{ form: "D", date: "2024-01-01", accession: "0000000001-24-000001" }],
   ...over,
 });
@@ -63,26 +62,34 @@ describe("getSubmissions", () => {
   it("keeps only the allow-listed fields", async () => {
     const r = await getSubmissions(fakeFetch({ [SUB]: JSON.stringify(subStripe) }), await fresh(), "1691342");
     expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.sub).toMatchObject({ cik: "1691342", name: "Stripe, Inc.", stateOfIncorporation: "DE", businessState: "CA", formerNames: [], ownerOnly: false });
+    if (!r.ok || !r.sub) throw new Error("expected a listable company");
+    expect(r.sub).toMatchObject({ cik: "1691342", name: "Stripe, Inc.", stateOfIncorporation: "DE", businessState: "CA", formerNames: [] });
     expect(r.sub.filings[0]).toEqual({ form: "D", date: "2024-04-12", accession: "0001691342-24-000001" });
     expect(r.sub.filings[1].form).toBe("D/A");
-    expect(Object.keys(r.sub).sort()).toEqual(["businessState", "cik", "filings", "formerNames", "name", "ownerOnly", "stateOfIncorporation"]);
+    expect(Object.keys(r.sub).sort()).toEqual(["businessState", "cik", "filings", "formerNames", "name", "stateOfIncorporation"]);
     expect(JSON.stringify(r.sub)).not.toMatch(/BERRY|298-5539/);
     expect(r.sub).not.toHaveProperty("ein");
   });
 
-  it("maps an empty incorporation state to null and flags owner-only filers", async () => {
-    const r = await getSubmissions(fakeFetch({ "https://data.sec.gov/submissions/CIK0009999999.json": JSON.stringify(subPerson) }), await fresh(), "9999999");
-    expect(r.ok && r.sub.stateOfIncorporation).toBeNull();
-    expect(r.ok && r.sub.ownerOnly).toBe(true);
-    expect(r.ok && r.sub.filings.map((x) => x.form)).toEqual(["4", "4", "4"]);
+  it("returns null for an individual filer and caches only a sentinel with no name", async () => {
+    const url = "https://data.sec.gov/submissions/CIK0009999999.json";
+    const f = fakeFetch({ [url]: JSON.stringify(subPerson) });
+    const cache = await fresh();
+    const r = await getSubmissions(f, cache, "9999999");
+    expect(r).toEqual({ ok: true, sub: null });
+    const entry = await cache.match(new Request("https://cache.competitive-analysis.invalid/" + encodeURIComponent(url)));
+    const raw = await (entry as Response).text();
+    expect(raw).toBe('{"listable":false}');
+    expect(raw).not.toMatch(/Person|"4"|0009999999/);
+    // a cached sentinel is "not listable" without a fetch
+    expect(await getSubmissions(f, cache, "9999999")).toEqual({ ok: true, sub: null });
+    expect(f.calls).toHaveLength(1);
   });
 
   it("reads former names", async () => {
     const body = { ...subStripe, formerNames: [{ name: "Old Co", from: "2010", to: "2012" }] };
     const r = await getSubmissions(fakeFetch({ [SUB]: JSON.stringify(body) }), await fresh(), "1691342");
-    expect(r.ok && r.sub.formerNames).toEqual(["Old Co"]);
+    expect(r.ok && r.sub?.formerNames).toEqual(["Old Co"]);
   });
 
   it("fails on a body that is not submissions", async () => {
@@ -170,13 +177,16 @@ describe("isListableCompany", () => {
     expect(isListableCompany(sub({ filings: filings("SC 13D", "DFAN14A") }))).toBe(false);
     expect(isListableCompany(sub({ filings: filings("DFAN14A", "PREC14A", "SC TO-T", "4", "144") }))).toBe(false);
   });
+  it("excludes an individual manager who files 13F-HR among activist and ownership forms", () => {
+    expect(isListableCompany(sub({ cik: "123456", name: "Person B", filings: filings("SC 13D/A", "4", "DFAN14A", "13F-HR", "13F-HR/A") }))).toBe(false);
+  });
   it("includes an 8-K plus Form 4 issuer", () => expect(isListableCompany(sub({ filings: filings("8-K", "4") }))).toBe(true));
   it("includes Stripe (D and D/A)", async () => {
     const r = await getSubmissions(fakeFetch({ [SUB]: JSON.stringify(subStripe) }), await fresh(), "1691342");
-    expect(r.ok && isListableCompany(r.sub)).toBe(true);
+    expect(r.ok && r.sub && isListableCompany(r.sub)).toBe(true);
   });
   it("includes the other company forms", () => {
-    for (const f of ["D", "D/A", "S-1", "10-K", "10-Q", "C", "1-A", "13F-HR", "DEF 14A", "424B4"]) {
+    for (const f of ["D", "D/A", "S-1", "10-K", "10-Q", "C", "1-A", "DEF 14A", "424B4"]) {
       expect(isListableCompany(sub({ filings: filings(f) })), f).toBe(true);
     }
   });
