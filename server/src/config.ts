@@ -30,3 +30,5 @@ export const PAGE_HISTORY_MAX_FETCHES = 30;
 export const PAGE_HISTORY_DEADLINE_MS = 25_000;
 /** The most characters of JSON in one tool result. */
 export const RESPONSE_CAP_CHARS = 20_000;
+/** The most characters in one tool result's text rendering; the structured result carries the rest. */
+export const RENDER_MAX_CHARS = 4_000;

@@ -1,3 +1,4 @@
+import { RENDER_MAX_CHARS } from "../config";
 import { errorResult } from "../contract/envelope";
 import type { PageHistoryResult, ToolInputs, ToolName, ToolResult, ToolResults } from "../contract/tools";
 import type { ArchiveFetch, Fetcher } from "../shared/http";
@@ -17,8 +18,23 @@ export const IMPLEMENTATIONS: { [K in ToolName]: Implementation<K> } = {
   sec_filings: notBuiltYet,
 };
 
-/** The short text rendering that goes with a result's structured content. */
+export const MORE_LINE = "… more in the structured result";
+
+/**
+ * Text cut to `max` characters, at the last line break that leaves room for
+ * MORE_LINE, then MORE_LINE. A text with no such line break, such as one line
+ * of JSON, is cut mid-line.
+ */
+export function capText(text: string, max: number = RENDER_MAX_CHARS): string {
+  if (text.length <= max) return text;
+  const room = max - MORE_LINE.length - 1;
+  const lineEnd = text.lastIndexOf("\n", room);
+  const head = lineEnd > 0 ? text.slice(0, lineEnd) : text.slice(0, room);
+  return `${head}\n${MORE_LINE}`;
+}
+
+/** The short text rendering that goes with a result's structured content, at most RENDER_MAX_CHARS long. */
 export function render(name: ToolName, result: ToolResult): string {
-  if (name === "page_history") return renderPageHistory(result as PageHistoryResult);
-  return JSON.stringify(result);
+  const text = name === "page_history" ? renderPageHistory(result as PageHistoryResult) : JSON.stringify(result);
+  return capText(text);
 }

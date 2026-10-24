@@ -4,7 +4,7 @@ import { errorResult } from "../../src/contract/envelope";
 import { pageHistoryOutput, type PageHistoryInput, type PageHistoryResult } from "../../src/contract/tools";
 import type { ArchiveFetch } from "../../src/shared/http";
 import type { CaptureRow } from "../../src/sources/wayback";
-import type { ToolDeps } from "../../src/tools";
+import { MORE_LINE, render, type ToolDeps } from "../../src/tools";
 import { pageHistory, renderPageHistory } from "../../src/tools/page-history";
 import { fakeArchive, type FakeArchive } from "../helpers/fake-archive";
 
@@ -53,6 +53,19 @@ async function call(
   const result = await pageHistory(input, await depsFor(archive, rest), { maxFetches, deadlineMs });
   expect(schema.safeParse(result).error).toBeUndefined();
   return result;
+}
+
+/** Nineteen changes whose title, headline and subheadings are 200 characters each, with eight prices. */
+function worstCase() {
+  const long = (label: string, i: number) => `${label} ${i} `.padEnd(200, "x");
+  const prices = (i: number) =>
+    Array.from({ length: 8 }, (_, k) => `Plan number ${k} for team ${i} costs $${i * 10 + k}/month`).join(". ");
+  return site(
+    (i) =>
+      `<html><head><title>${long("Title", i)}</title><meta name="description" content="${long("About", i)}"></head><body>` +
+      `<h1>${long("Headline", i)}</h1><h2>${long("One", i)}</h2><h2>${long("Two", i)}</h2><h2>${long("Three", i)}</h2>` +
+      `<p>${prices(i)}</p></body></html>`,
+  );
 }
 
 const pairs = (r: PageHistoryResult) => (r.changes ?? []).map((c) => [c.before.timestamp, c.after.timestamp]);
@@ -300,14 +313,7 @@ describe("page_history: output", () => {
   });
 
   it("the largest result stays under the cap", async () => {
-    const long = (label: string, i: number) => `${label} ${i} `.padEnd(200, "x");
-    const prices = (i: number) =>
-      Array.from({ length: 8 }, (_, k) => `Plan number ${k} for team ${i} costs $${i * 10 + k}/month`).join(". ");
-    const page = (i: number) =>
-      `<html><head><title>${long("Title", i)}</title><meta name="description" content="${long("About", i)}"></head><body>` +
-      `<h1>${long("Headline", i)}</h1><h2>${long("One", i)}</h2><h2>${long("Two", i)}</h2><h2>${long("Three", i)}</h2>` +
-      `<p>${prices(i)}</p></body></html>`;
-    const r = await call({ ...JAN, max_changes: 15 }, fakeArchive(site(page)));
+    const r = await call({ ...JAN, max_changes: 15 }, fakeArchive(worstCase()));
     expect(r.changes!.length).toBeGreaterThan(0);
     expect(JSON.stringify(r).length).toBeLessThanOrEqual(20_000);
     expect(r.notes.some((n) => n.includes("more changes not shown"))).toBe(true);
@@ -321,6 +327,22 @@ describe("page_history: output", () => {
     expect(lines).toHaveLength(2);
     expect(lines[0]).toContain(`between ${dateOf(8)} and ${dateOf(9)}`);
     expect(lines[0]).toContain("Plans for Bravo");
+  });
+
+  it("the worst-case render stops at 4000 characters, at a line break, with a pointer to the structured result", async () => {
+    const r = await call({ ...JAN, max_changes: 15 }, fakeArchive(worstCase()));
+    const full = renderPageHistory(r);
+    expect(full.length).toBeGreaterThan(4000);
+    const text = render("page_history", r);
+    expect(text.length).toBeLessThanOrEqual(4000);
+    expect(text.endsWith(`\n${MORE_LINE}`)).toBe(true);
+    const kept = text.slice(0, -MORE_LINE.length - 1);
+    expect(full.startsWith(`${kept}\n`)).toBe(true);
+  });
+
+  it("a short render is unchanged", async () => {
+    const r = await call(JAN, fakeArchive(copies((i) => (i <= 8 ? "Alpha" : i <= 10 ? "Bravo" : "Charlie"))));
+    expect(render("page_history", r)).toBe(renderPageHistory(r));
   });
 
   it("renders an error with the fallback line", () => {
