@@ -1,12 +1,14 @@
 # Competitive Analysis — repo notes for agents
 
-A skills-only ChatGPT/Codex plugin: **Competitive Analysis**, plugin id
+A ChatGPT/Codex and Claude plugin: **Competitive Analysis**, plugin id
 `competitive-analysis`, one skill with id `teardown`. It packages the method of Aaron's
 private `competitive-analysis` skill. The two are separate skills, and the private one keeps
 its name, so `/competitive-analysis` on Aaron's machines still opens the private version.
-Claude is the fast follow: the same package with one added manifest, after the ChatGPT
-submission. Start at § Pick up here in `plans/next-steps-2026-10-05.md`. Formerly "Worry Or
-Not" (renamed 2026-10-11); plans and session logs keep the old name as history.
+Released so far as skills-only (0.1.0, never published). OpenAI stopped taking skills-only
+submissions, so 0.2.0 adds the plugin's own MCP server in `server/`, built but not deployed
+as of 2026-10-24. The ChatGPT and Claude versions ship together. Start at § Pick up here in
+`plans/next-steps-2026-10-05.md`. Formerly "Worry Or Not" (renamed 2026-10-11); plans and
+session logs keep the old name as history.
 
 ## Where things live
 
