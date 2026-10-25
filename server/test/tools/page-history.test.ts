@@ -425,6 +425,17 @@ describe("page_history: budget, deadline and failures", () => {
     expect(r.error).toMatchObject({ reason: "source_rate_limited", fallback: "fall back to browsing for this check." });
     expect(fake.calls).toHaveLength(2);
   });
+
+  it("a failed capture listing keeps the notes from before it", async () => {
+    // As on staging: the earliest-capture lookup is refused, and the gate then pauses the listing.
+    const fake = fakeArchive({ ...copies(() => "Alpha"), failAt: 1 });
+    const paused: ArchiveFetch = async (url, opts) =>
+      fake.calls.length >= 1 ? { ok: false, reason: "source_rate_limited", url, detail: "archive requests paused after a refusal" } : fake(url, opts);
+    const r = await call(JAN, paused);
+    expect(r.status).toBe("error");
+    expect(r.error?.detail).toBe("archive requests paused after a refusal");
+    expect(r.notes.some((n) => n.includes("archive refused") && n.includes("earliest") && n.includes("HTTP 429"))).toBe(true);
+  });
 });
 
 describe("page_history: unreadable captures", () => {
@@ -609,6 +620,15 @@ describe("page_history: output", () => {
     const text = renderPageHistory(errorResult("bad_input", "IP addresses are not accepted", [], NOW));
     expect(text).toContain("bad_input");
     expect(text).toContain("fall back to browsing for this check.");
+  });
+
+  it("renders an error's notes after its first line", () => {
+    const failed = errorResult("source_rate_limited", "archive requests paused after a refusal", [], NOW);
+    const text = renderPageHistory({ ...failed, notes: ["archive refused the earliest-capture lookup (HTTP 429)"] });
+    expect(text.split("\n")).toEqual([
+      "page_history failed (source_rate_limited): archive requests paused after a refusal. fall back to browsing for this check.",
+      "note: archive refused the earliest-capture lookup (HTTP 429)",
+    ]);
   });
 });
 

@@ -340,7 +340,8 @@ export async function pageHistory(
     range.from.replace("-", ""),
     range.to.replace("-", ""),
   );
-  if (!listed.ok) return errorResult(listed.reason, listed.detail, [listed.url], deps.now());
+  // Keep the notes: the earliest-capture lookup's failure is often what caused this one.
+  if (!listed.ok) return { ...errorResult(listed.reason, listed.detail, [listed.url], deps.now()), notes };
   const captures = distinct(listed.captures);
   const hitLimit = listed.captures.length >= CDX_LIMIT;
   if (hitLimit) {
@@ -463,9 +464,10 @@ function changeLine(c: Change): string {
 export function renderPageHistory(r: PageHistoryResult): string {
   if (r.status === "error") {
     const e = r.error;
-    return e
+    const head = e
       ? `page_history failed (${e.reason}): ${e.detail}. ${e.fallback}`
       : "page_history failed. fall back to browsing for this check.";
+    return [head, ...r.notes.map((n) => `note: ${n}`)].join("\n");
   }
   const changes = r.changes ?? [];
   const first = r.first_capture;
