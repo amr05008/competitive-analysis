@@ -29,3 +29,23 @@ class_name = "Limits"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Limits"]
+
+# Environments inherit observability (off), workers_dev, preview_urls and the
+# migrations above. Vars and Durable Object bindings don't inherit, so each
+# environment repeats them.
+
+# A custom domain, not workers.dev, because the Cache API does nothing on
+# workers.dev. No crons: the self-check belongs to production.
+[env.staging]
+name = "competitive-analysis-staging"
+routes = [{ pattern = "competitive-analysis-staging.aaronmichaelroy.com", custom_domain = true }]
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+DAILY_TOOL_CALL_CAP = "200"
+# About 900 on the paid plan.
+SUBREQUEST_LIMIT = "45"
+
+[[env.staging.durable_objects.bindings]]
+name = "LIMITS"
+class_name = "Limits"
