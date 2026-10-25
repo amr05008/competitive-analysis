@@ -43,8 +43,8 @@ routes = [{ pattern = "competitive-analysis-staging.aaronmichaelroy.com", custom
 [env.staging.vars]
 ENVIRONMENT = "staging"
 DAILY_TOOL_CALL_CAP = "200"
-# About 900 on the paid plan.
-SUBREQUEST_LIMIT = "45"
+# The account is on Workers Paid (2026-10-25), which allows 10,000 per request.
+SUBREQUEST_LIMIT = "900"
 # The archive refuses Cloudflare's network; see ../relay. ARCHIVE_RELAY_TOKEN
 # is a secret.
 ARCHIVE_RELAY_URL = "https://competitive-analysis-relay.vercel.app/api/archive"
