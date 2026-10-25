@@ -45,6 +45,9 @@ ENVIRONMENT = "staging"
 DAILY_TOOL_CALL_CAP = "200"
 # About 900 on the paid plan.
 SUBREQUEST_LIMIT = "45"
+# The archive refuses Cloudflare's network; see ../relay. ARCHIVE_RELAY_TOKEN
+# is a secret.
+ARCHIVE_RELAY_URL = "https://competitive-analysis-relay.vercel.app/api/archive"
 
 [[env.staging.durable_objects.bindings]]
 name = "LIMITS"
