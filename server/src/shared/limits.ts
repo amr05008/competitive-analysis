@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import type { ToolName } from "../contract/tools";
 import { ArchiveGate } from "./archive-gate";
 import type { ArchiveFetch, FetchOutcome } from "./http";
+import { archiveFetcher } from "./relay";
 import { UsageStore, type Outcome, type UsageRow } from "./usage-store";
 
 /** A cap that isn't a whole number of calls refuses every call rather than none. */
@@ -23,7 +24,7 @@ export class Limits extends DurableObject<Env> {
     super(ctx, env);
     this.#store = new UsageStore(ctx.storage.sql, () => Date.now(), parseCap(env.DAILY_TOOL_CALL_CAP));
     this.#gate = new ArchiveGate(
-      (input, init) => fetch(input, init),
+      archiveFetcher(env, (input, init) => fetch(input, init)),
       () => Date.now(),
       (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     );

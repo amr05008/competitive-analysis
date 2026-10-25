@@ -24,6 +24,9 @@ not deployed yet.
 - `assets/`: icon and logo.
 - `server/`: the MCP server, a Cloudflare Worker. Public code, and it never goes in the
   zip. See [`server/README.md`](server/README.md).
+- `relay/`: a Vercel Function that makes the server's Wayback Machine requests, because the
+  archive rate-limits Cloudflare's network. Never in the zip. See
+  [`relay/README.md`](relay/README.md).
 - `LICENSE`: MIT. Ships in the zip.
 
 Planning notes and the test log are kept outside this repo.

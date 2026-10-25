@@ -5,8 +5,8 @@ A ChatGPT/Codex and Claude plugin: **Competitive Analysis**, plugin id
 private `competitive-analysis` skill. The two are separate skills, and the private one keeps
 its name, so `/competitive-analysis` on Aaron's machines still opens the private version.
 Released so far as skills-only (0.1.0, never published). OpenAI stopped taking skills-only
-submissions, so 0.2.0 adds the plugin's own MCP server in `server/`, built but not deployed
-as of 2026-10-24. The ChatGPT and Claude versions ship together. Start at § Pick up here in
+submissions, so 0.2.0 adds the plugin's own MCP server in `server/`, on staging since
+2026-10-24 and not yet in production. The ChatGPT and Claude versions ship together. Start at § Pick up here in
 `plans/next-steps-2026-10-05.md`. Formerly "Worry Or Not" (renamed 2026-10-11); plans and
 session logs keep the old name as history.
 
@@ -40,6 +40,9 @@ session logs keep the old name as history.
 - `server/`: the plugin's MCP server (Cloudflare Worker). Public code, never in the zip. The
   tool contract in `server/src/contract/` changes additively only, and `npm test` enforces
   it. Never log tool inputs.
+- `relay/`: a Vercel Function (Hobby) that makes the server's Wayback Machine requests,
+  because the archive rate-limits Cloudflare's network. Token-gated, logs nothing, never in
+  the zip.
 - Each uploaded zip's commit is tagged `v<version>`. The build refuses to zip a tagged
   version from different files.
 - This repo is Aaron's only public competitive-analysis plugin. The February 2026 Claude

@@ -18,6 +18,12 @@ export type FailedOutcome = Extract<FetchOutcome, { ok: false }>;
 export const REFUSED_STATUS = 599;
 
 /**
+ * A fetcher's own failure, such as the archive relay's (see relay.ts). politeFetch reports it as
+ * source_unavailable with its message as the detail, never as a connection failure, so it isn't a refusal.
+ */
+export class FetcherError extends Error {}
+
+/**
  * One Wayback Machine request through the server-wide gate. With `startBy` (an absolute time in ms), the
  * gate answers server_busy with REFUSED_STATUS instead of starting the request after that moment.
  */
@@ -98,6 +104,7 @@ export async function politeFetch(
     return { ok: true, status: res.status, url: finalUrl, text, truncated };
   } catch (e) {
     if (timedOut) return fail("source_unavailable", `timeout after ${timeoutMs} ms`);
+    if (e instanceof FetcherError) return fail("source_unavailable", e.message);
     return fail("source_unavailable", `connection failed (${e instanceof Error ? e.name : "error"})`);
   } finally {
     clearTimeout(timer);

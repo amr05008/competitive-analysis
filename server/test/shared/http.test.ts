@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { USER_AGENT } from "../../src/config";
-import { politeFetch } from "../../src/shared/http";
+import { FetcherError, politeFetch } from "../../src/shared/http";
 
 const respond = (body: string, status = 200) => async () => new Response(body, { status });
 
@@ -36,6 +36,11 @@ describe("politeFetch", () => {
     const r = await politeFetch(async () => { throw new TypeError("boom"); }, "https://a.com/");
     expect(r).toMatchObject({ ok: false, reason: "source_unavailable" });
     expect((r as { detail: string }).detail).toContain("connection");
+  });
+
+  it("reports a fetcher's own failure in its words, not as a connection failure", async () => {
+    const r = await politeFetch(async () => { throw new FetcherError("relay unavailable (HTTP 404)"); }, "https://a.com/");
+    expect(r).toMatchObject({ ok: false, reason: "source_unavailable", detail: "relay unavailable (HTTP 404)" });
   });
 
   it("maps a timeout", async () => {

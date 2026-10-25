@@ -29,6 +29,11 @@ npm run typecheck   # the Worker, then scripts/ with Node's types
 npm run dev         # a local server at http://localhost:8787
 npm run live -- --url http://localhost:8787/mcp --out ../plans/live-YYYY-MM-DD-local.json
                     # live checks against real Hightouch and ZeroClick data
+npm run deploy:staging
+                    # https://competitive-analysis-staging.aaronmichaelroy.com/mcp
+npm run live -- --url https://competitive-analysis-staging.aaronmichaelroy.com/mcp \
+  --out ../plans/live-YYYY-MM-DD-staging.json
+                    # the same checks, from Cloudflare's network
 ```
 
 `npm run live` is a client only: it calls a running server's tools with real inputs, prints
@@ -60,6 +65,14 @@ instead.
 
 - After editing `wrangler.toml`, run `npx wrangler types` and commit
   `worker-configuration.d.ts`.
+- Staging (`[env.staging]`) is public but unlisted, with no crons. It's on a custom domain
+  rather than `workers.dev` because the Cache API does nothing on `workers.dev`. It repeats
+  the vars and the `LIMITS` binding, since environments don't inherit those.
+- The Wayback Machine rate-limits Cloudflare's whole network as one client. So where an
+  environment sets `ARCHIVE_RELAY_URL`, archive requests go through the relay in `../relay`,
+  with the `ARCHIVE_RELAY_TOKEN` secret. Dev and tests leave it unset and go direct. An answer
+  the relay didn't mark as the archive's is reported as the relay's failure, never as the
+  archive's status.
 - `SUBREQUEST_LIMIT` (45) caps each tool call's fetches plus Cache API calls. The free plan
   counts both against one limit of 50 per request, and a tool that reaches 45 returns what it
   has as partial, with a note to call again. On the paid plan, raise it to about 900.
