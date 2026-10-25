@@ -1,10 +1,13 @@
 # Competitive Analysis
 
-A ChatGPT and Codex plugin that produces an evidence-graded teardown of one company.
-The method comes from the `competitive-analysis` skill in
+A ChatGPT/Codex and Claude plugin that produces an evidence-graded teardown of one
+company. The method comes from the `competitive-analysis` skill in
 [amr05008/agent-skills](https://github.com/amr05008/agent-skills); this repo packages
-it for the plugin directory. Claude follows from the same package after the ChatGPT
-submission.
+it for the plugin directories. The ChatGPT and Claude versions ship together.
+
+Version 0.2.0 adds the plugin's own MCP server, with tools for page history, job boards,
+Hacker News discussion and SEC filings. The server is built and tested in `server/` but
+not deployed yet.
 
 ## Layout
 
@@ -19,11 +22,17 @@ submission.
 - `scripts/build.sh`: regenerates both, checks the listing limits and vendor names, and
   writes `dist/competitive-analysis-<version>.zip`.
 - `assets/`: icon and logo.
+- `server/`: the MCP server, a Cloudflare Worker. Public code, and it never goes in the
+  zip. See [`server/README.md`](server/README.md).
 - `LICENSE`: MIT. Ships in the zip.
 
 Planning notes and the test log are kept outside this repo.
 
-## Before submission
+## 0.1.0 checklist (skills-only, parked)
+
+0.1.0 was uploaded to OpenAI as a draft but never submitted, because OpenAI stopped taking
+skills-only submissions. The checklist for 0.2.0, the version with the server, is kept with
+the private plans.
 
 - [x] Fetch test passed in ChatGPT (CDX, raw `id_` capture, Greenhouse and Ashby JSON). 2026-10-05
 - [ ] `developerName` matches the verified identity exactly.
