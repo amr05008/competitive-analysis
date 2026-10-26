@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "competitive-analysis",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Evidence-graded teardown of one company: positioning history, job-listing mining, contradictions, absence as evidence, and a label on every claim.",
   "author": {
     "name": "Aaron Roy",
@@ -23,7 +23,7 @@
       "interface": {
         "displayName": "Competitive Analysis",
         "shortDescription": "Research companies and URLs",
-        "longDescription": "The Competitive Analysis plugin helps founders, product people and business analysts tear down companies and landing pages to understand positioning, product capabilities, and company growth.\n\nHow it works:\n- You name a company and/or a landing page\n- The report dates changes in positioning and pricing from Wayback Machine captures, reads the company's own job listings for what it's actually building, reconciles sources that disagree, and treats silence as evidence.\n- You get a teardown where every claim carries a link, a date, and a VERIFIED / COMPANY-CLAIMED / ESTIMATE label\n\nThis plugin researches companies, not people. To get the most from this plugin, you should have the Clay plugin enabled, but it will also be valuable without that turned on.",
+        "longDescription": "The Competitive Analysis plugin helps founders, product people and business analysts tear down companies and landing pages to understand positioning, product capabilities, and company growth.\n\nHow it works:\n- You name a company and/or a landing page\n- The report dates changes in positioning and pricing from Wayback Machine captures, reads the company's own job listings for what it's actually building, reconciles sources that disagree, and treats silence as evidence.\n- The plugin's own server does the fetching a browser struggles with: it finds the captures where a page's copy changed, reads the company's public job board, counts Hacker News discussion by year, and pulls Form D fundraising notices from SEC EDGAR. It only reads free public sources and keeps no personal data. If it's busy, the teardown carries on with ChatGPT's own browsing.\n- You get a teardown where every claim carries a link, a date, and a VERIFIED / COMPANY-CLAIMED / ESTIMATE label\n\nThis plugin researches companies, not people. To get the most from this plugin, you should have the Clay plugin enabled, but it will also be valuable without that turned on.",
         "developerName": "Aaron Roy",
         "category": "Business & Operations",
         "capabilities": [
@@ -43,7 +43,7 @@
         "logo": "./assets/logo.png"
       },
       "publication": {
-        "release_notes": "Initial release."
+        "release_notes": "Competitive Analysis now has its own server. Four read-only tools pull the evidence that browsing alone kept missing: when a company's homepage and pricing copy changed (from Wayback Machine captures), its open roles from a public Greenhouse, Lever or Ashby board, Hacker News discussion by year, and SEC filings, including Form D fundraising notices. The tools only read free public sources, need no sign-in and keep no personal data. If the server is busy or down, the teardown still finishes with the app's own browsing and lists what it couldn't check."
       }
     }
   }
