@@ -14,21 +14,24 @@ Hacker News discussion and SEC filings. The server in `server/` has been live at
 
 - `listing/competitive-analysis-listing.md`: the store listing (name, subtitle, prompts,
   description, release notes). The one place to edit them.
-- `plugin.json`: the portable manifest. Its listing fields are **generated** from the
-  listing file; the rest is edited by hand.
-- `skills/teardown/SKILL.md`: the method, written for a model with a browser and
-  whatever plugins the user connected.
-- `skills/teardown/references/report-template.md`: **generated** by
-  `scripts/build.sh` from agent-skills; the report contract has one source.
-- `scripts/build.sh`: regenerates both, checks the listing limits and vendor names, and
-  writes `dist/competitive-analysis-<version>.zip`.
-- `assets/`: icon and logo.
+- `plugin/`: the plugin itself, and the only folder that ships. Everything below it is
+  what someone who installs the plugin gets.
+  - `plugin.json`: the portable manifest. Its listing fields are **generated** from the
+    listing file; the rest is edited by hand.
+  - `skills/teardown/SKILL.md`: the method, written for a model with a browser and
+    whatever plugins the user connected.
+  - `skills/teardown/references/report-template.md`: **generated** by
+    `scripts/build.sh` from agent-skills; the report contract has one source.
+  - `assets/`: icon and logo.
+  - `LICENSE`: a copy of the root `LICENSE`; the build checks that they match.
+- `scripts/build.sh`: regenerates the two generated files, checks the listing limits and
+  vendor names, and writes `dist/competitive-analysis-<version>.zip`.
 - `server/`: the MCP server, a Cloudflare Worker. Public code, and it never goes in the
   zip. See [`server/README.md`](server/README.md).
 - `relay/`: a Vercel Function that makes the server's Wayback Machine requests, because the
   archive rate-limits Cloudflare's network. Never in the zip. See
   [`relay/README.md`](relay/README.md).
-- `LICENSE`: MIT. Ships in the zip.
+- `LICENSE`: MIT.
 
 Planning notes and the test log are kept outside this repo.
 

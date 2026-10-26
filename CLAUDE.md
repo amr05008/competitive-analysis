@@ -16,16 +16,20 @@ session logs keep the old name as history.
   desktop app's personal marketplace (`~/.agents/plugins/marketplace.json`) resolves plugin
   paths relative to the home folder and will not follow symlinks.
   `~/repos/competitive-analysis` is a symlink here. Do not move the directory without
-  updating `marketplace.json`.
+  updating `marketplace.json`, whose entry points at `plugin/`.
+- **`plugin/` is the plugin**: the folder Claude's directory lists (Decision 1, 2026-10-26),
+  and all that people who install it get. It holds `plugin.json`, `LICENSE` (a copy of the
+  root one, which the build checks), `skills/` and `assets/`. The server, relay, scripts and
+  listing stay outside it, so the directory never scans or ships them.
 - The method's source of truth is the `competitive-analysis` skill in the private
   `claude-channels` repo, mirrored publicly to `amr05008/agent-skills`.
-  `skills/teardown/references/report-template.md` is **generated** by
+  `plugin/skills/teardown/references/report-template.md` is **generated** by
   `scripts/build.sh` from the agent-skills checkout. Never edit it here.
 - The store listing's source is `listing/competitive-analysis-listing.md`: version, name,
   subtitle, category and prompts in its frontmatter, the description and release notes in its
-  body. `scripts/build.sh` (via `scripts/listing.py`) copies them into `plugin.json`, checks
-  the directory's limits, the plugin id and vendor names in `skills/`, and zips the package
-  into `dist/`. Never hand-edit `version`, `displayName`, `shortDescription`,
+  body. `scripts/build.sh` (via `scripts/listing.py`) copies them into `plugin/plugin.json`,
+  checks the directory's limits, the plugin id and vendor names in `plugin/skills/`, and zips
+  the package into `dist/`. Never hand-edit `version`, `displayName`, `shortDescription`,
   `longDescription`, `category`, `defaultPrompt` or `publication.release_notes` in
   `plugin.json`; the rest of `plugin.json` (URLs, icons, ids) is edited by hand. Aaron edits
   the listing in Obsidian: `listing/` is symlinked into his vault at
@@ -67,7 +71,7 @@ session logs keep the old name as history.
 
 ## Test loop
 
-1. Edit `skills/teardown/SKILL.md`.
+1. Edit `plugin/skills/teardown/SKILL.md`.
 2. Quit the ChatGPT desktop app (Cmd+Q), reopen, Plugins → "Aaron's local plugins" →
    reinstall if offered.
 3. New chat, no @-mention: `Should we worry about ZeroClick? zeroclick.ai`. Runs so far are

@@ -14,8 +14,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+PLUGIN = ROOT / "plugin"  # the folder Claude's directory lists (Decision 1, 2026-10-26)
 LISTING = Path(os.environ.get("LISTING", ROOT / "listing" / "competitive-analysis-listing.md"))
-MANIFEST = ROOT / "plugin.json"
+MANIFEST = PLUGIN / "plugin.json"
 PLUGIN_ID = "competitive-analysis"  # fixed for the life of the listing
 # Vendor names belong in the listing and on the site, never in a model-readable file.
 VENDORS = ["Clay", "Exa", "Firecrawl", "Monid"]
@@ -97,7 +98,7 @@ def check_length(errors, label, value, limit):
 def vendor_mentions():
     found = []
     pattern = re.compile(r"\b(" + "|".join(VENDORS) + r")\b")
-    for path in sorted((ROOT / "skills").rglob("*.md")):
+    for path in sorted((PLUGIN / "skills").rglob("*.md")):
         for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             for m in pattern.finditer(line):
                 found.append(f"{path.relative_to(ROOT)}:{n} names {m.group(1)}")
