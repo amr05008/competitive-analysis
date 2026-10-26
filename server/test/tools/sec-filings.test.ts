@@ -439,6 +439,19 @@ describe("sec_filings", () => {
     expect(result.notes.join(" ")).not.toMatch(/could not be read|connection failed/);
   });
 
+  it("names a name whose search the hard deadline cut, and claims no absence for it", async () => {
+    const fetch = hangingOn(fakeFetch({ [`${SEARCH}Hightouch`]: JSON.stringify(searchEmpty) }), `${SEARCH}carry`);
+    const result = await secFilings({ company_name: "Hightouch", domain: "carry.com" }, await deps(fetch), {
+      sleep: async () => {},
+      hardDeadlineMs: 50,
+    });
+    expect(schema.safeParse(result).error).toBeUndefined();
+    expect(result.names_tried).toEqual(["Hightouch", "carry"]);
+    expect(result.status).toBe("partial");
+    expect(result.statement).toBeNull();
+    expect(result.notes.join(" ")).toMatch(/time limit of \d+ s reached, so the name "carry" was not searched/);
+  });
+
   it("shortens lists to fit the response size", async () => {
     const many = Array.from({ length: 5 }, (_, i) => [String(300 + i), `Long ${i} ${"x".repeat(100)}`] as [string, string]);
     const routes: Record<string, Route> = { [`${SEARCH}Long`]: searchBody(many) };

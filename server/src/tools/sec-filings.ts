@@ -110,9 +110,12 @@ export async function secFilings(
     }
     const r = await searchEntities(gate, deps.cache, n);
     if (!r.ok) {
-      if (r.status !== REFUSED_STATUS && !budget.cut) {
+      partial = true;
+      if (r.status === REFUSED_STATUS || budget.cut) {
+        // This server's budget refused or cut the search, so the name was never searched.
+        notes.push(`${stopReason()}, so the name "${n}" was not searched; ${advice()}`);
+      } else {
         firstSearchFailure ??= r;
-        partial = true;
         notes.push(`the search for "${n}" failed (${failText(r)})`);
       }
       continue;
