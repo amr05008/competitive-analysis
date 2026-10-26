@@ -178,13 +178,15 @@ export async function extractFingerprint(html: string): Promise<Fingerprint> {
 
 const ONE_PRICE = new RegExp(PRICE.source, "i");
 
+/** A page's price amounts, in order, without the words around them. */
+export const priceAmounts = (fp: Fingerprint): string[] => fp.prices.map((p) => amountKey(p.match(ONE_PRICE)?.[0] ?? p));
+
 /**
  * A comparison key: two pages with the same key have the same copy, ignoring case and spacing.
  * Prices count by amount only, so a change in the words around one is not a change.
  */
 export function copyKey(fp: Fingerprint): string {
-  const amounts = fp.prices.map((p) => amountKey(p.match(ONE_PRICE)?.[0] ?? p));
-  return JSON.stringify([fp.title, fp.description, fp.headline, fp.subheadings, amounts])
+  return JSON.stringify([fp.title, fp.description, fp.headline, fp.subheadings, priceAmounts(fp)])
     .toLowerCase()
     .replace(/\s+/g, " ");
 }

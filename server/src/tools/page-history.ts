@@ -5,7 +5,7 @@ import { Budget } from "../shared/budget";
 import { REFUSED_STATUS, type ArchiveFetch, type FailedOutcome, type FetchOutcome } from "../shared/http";
 import { normalizePageUrl } from "../shared/inputs";
 import { limitReached } from "../shared/subrequests";
-import { copyKey, type Fingerprint } from "../sources/fingerprint";
+import { copyKey, priceAmounts, type Fingerprint } from "../sources/fingerprint";
 import { CDX_LIMIT, captureLink, earliestCapture, fingerprintAt, listCaptures, type CaptureRow } from "../sources/wayback";
 import type { ToolDeps } from ".";
 
@@ -273,6 +273,26 @@ function stopNote(stop: Stop, maxFetches: number, deadlineMs: number, subrequest
   }
 }
 
+/** Each price gained or lost counts as this many title or headline words. */
+const PRICE_WORDS = 3;
+
+const wordSet = (...texts: string[]) => new Set(texts.join(" ").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
+const gainedOrLost = (a: Set<string>, b: Set<string>) =>
+  [...a].filter((x) => !b.has(x)).length + [...b].filter((x) => !a.has(x)).length;
+
+/**
+ * How much copy a change changed: title and headline words and prices gained or lost, then
+ * subheading words, which only break ties. Words count once, so a brand name added to a title
+ * that already has it counts for nothing.
+ */
+function sizeOf(before: Fingerprint, after: Fingerprint): [number, number] {
+  return [
+    gainedOrLost(wordSet(before.title, before.headline), wordSet(after.title, after.headline)) +
+      PRICE_WORDS * gainedOrLost(new Set(priceAmounts(before)), new Set(priceAmounts(after))),
+    gainedOrLost(wordSet(...before.subheadings), wordSet(...after.subheadings)),
+  ];
+}
+
 /** Visible copy only: what the snapshots show, without the meta description. */
 const shownKey = (fp: Fingerprint) => copyKey({ ...fp, description: "" });
 
@@ -388,21 +408,36 @@ export async function pageHistory(
 
   const status = search.stop || !earliest.ok || hitLimit ? "partial" : "ok";
 
+  // Over max_changes, the largest changes are kept; between equal ones, the later.
+  const sizes = brackets.map((b) => sizeOf(fpAt(b.i), fpAt(b.j)));
+  const ranked = brackets.map((_, k) => k).sort((x, y) => sizes[y][0] - sizes[x][0] || sizes[y][1] - sizes[x][1] || y - x);
+  const largest = (shown: number) => {
+    const kept = new Set(ranked.slice(0, shown));
+    return { kept: brackets.filter((_, k) => kept.has(k)), hidden: brackets.filter((_, k) => !kept.has(k)) };
+  };
+
   /** The note for changes left out: their dates, and the call that shows them. */
   const hiddenNote = (hidden: Bracket[]): string => {
+    const one = hidden.length === 1;
     const dates = hidden.map((b) => dateOf(captures[b.j].timestamp));
     const more = dates.length > MAX_WIDE_LISTED ? ` and ${dates.length - MAX_WIDE_LISTED} more` : "";
-    const head = `${plural(hidden.length, "more change")} not shown, dated ${dates.slice(0, MAX_WIDE_LISTED).join(", ")}${more}`;
-    // From the month of the first hidden change's earlier capture, so the next call still brackets it.
-    const from = monthOf(captures[hidden[0].i].timestamp);
-    if (from > range.from) return `${head}; call again with from=${from} to see ${hidden.length === 1 ? "it" : "them"}`;
+    const head =
+      `${plural(hidden.length, "more change")} not shown, ${one ? "the one" : "the ones"} that changed the least copy, ` +
+      `dated ${dates.slice(0, MAX_WIDE_LISTED).join(", ")}${more}`;
     if (maxChanges < MAX_CHANGES) return `${head}; call again with max_changes up to ${MAX_CHANGES} to see more`;
-    return head;
+    // The months of the first hidden change's two captures, so the narrower call still brackets it.
+    const from = monthOf(captures[hidden[0].i].timestamp);
+    const to = monthOf(captures[hidden[0].j].timestamp);
+    if (from === range.from && to === range.to) return head;
+    return one
+      ? `${head}; call again with from=${from} to=${to} to see it`
+      : `${head}; call again with a narrower range to see them, such as from=${from} to=${to} for the first`;
   };
 
   const assemble = (shown: number, level: number): PageHistoryResult => {
+    const { kept, hidden } = largest(shown);
     const extra: string[] = [];
-    if (brackets.length > shown) extra.push(hiddenNote(brackets.slice(shown)));
+    if (hidden.length) extra.push(hiddenNote(hidden));
     if (level > 0) extra.push("titles, headings and prices are shortened to fit the response size");
     return {
       status,
@@ -412,7 +447,7 @@ export async function pageHistory(
       range: { from: range.from, to: range.to },
       first_capture: firstCapture,
       captures_in_range: captures.length,
-      changes: brackets.slice(0, shown).map((b) => {
+      changes: kept.map((b) => {
         const before = captures[b.i];
         const after = captures[b.j];
         return {
@@ -426,7 +461,7 @@ export async function pageHistory(
     };
   };
 
-  // Shorten the copy first, then drop the latest changes, until the result fits.
+  // Shorten the copy first, then drop the smallest changes, until the result fits.
   const fits = (r: PageHistoryResult) => JSON.stringify(r).length <= RESPONSE_CAP_CHARS;
   let shown = Math.min(maxChanges, brackets.length);
   let level = 0;

@@ -49,7 +49,9 @@ export const pageHistoryInput = {
     .min(1)
     .max(15)
     .optional()
-    .describe("The most changes to return, from 1 to 15; defaults to 10."),
+    .describe(
+      "The most changes to return, from 1 to 15; defaults to 10. When there are more, the ones that changed the most title, headline and price copy are kept, in date order.",
+    ),
 };
 
 const captureFields = {

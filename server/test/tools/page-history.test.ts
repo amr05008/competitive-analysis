@@ -115,27 +115,57 @@ describe("page_history: dating changes", () => {
     expect(r.changes!.every((c) => c.resolved)).toBe(true);
   });
 
-  it("keeps the first max_changes changes by date, defaulting to 10, and says how many more there are", async () => {
+  it("over max_changes, keeps the changes with the most title and headline words changed, in date order", async () => {
+    // Every capture renames a section; three of them also start a new headline.
+    const era = (i: number) =>
+      i < 5 ? "Sync data to every tool" : i < 12 ? "The composable customer data platform" : i < 17 ? "Marketing needs data and AI" : "Make your marketers limitless";
+    const fake = fakeArchive(site((i) => `<title>Example</title><h1>${era(i)}</h1><h2>Section ${i}</h2>`));
+    const r = await call({ ...JAN, max_changes: 3 }, fake);
+    expect(r.status).toBe("ok");
+    expect(pairs(r)).toEqual([
+      [ts(4), ts(5)],
+      [ts(11), ts(12)],
+      [ts(16), ts(17)],
+    ]);
+  });
+
+  it("counts each price gained or lost as more than a word of the title", async () => {
+    // A three-word title change at capture 7, then a price change at capture 14.
+    const page = (i: number) =>
+      `<title>${i < 7 ? "Example" : "Example for growing teams"}</title><h1>Plans</h1><p>Team plan costs ${i < 14 ? "$350" : "$400"}/month</p>`;
+    const r = await call({ ...JAN, max_changes: 1 }, fakeArchive(site(page)));
+    expect(pairs(r)).toEqual([[ts(13), ts(14)]]);
+  });
+
+  it("breaks ties by subheading words before date", async () => {
+    // A five-word subheading change at capture 5; a change in the meta description only at capture 14.
+    const page = (i: number) =>
+      `<title>Example</title><meta name="description" content="${i < 14 ? "One" : "Two"}"><h1>Plans</h1>` +
+      `<h2>${i < 5 ? "Teams" : "Teams of every size and shape"}</h2>`;
+    const r = await call({ ...JAN, max_changes: 1 }, fakeArchive(site(page)));
+    expect(pairs(r)).toEqual([[ts(4), ts(5)]]);
+  });
+
+  it("between changes of the same size, keeps the later ones, and says how many more there are", async () => {
     const fake = fakeArchive(copies((i) => `Copy ${String.fromCharCode(65 + i)}`));
     const r = await call(JAN, fake);
     expect(r.status).toBe("ok");
-    expect(pairs(r)).toEqual(Array.from({ length: 10 }, (_, i) => [ts(i), ts(i + 1)]));
-    // The hidden changes start in the range's first month, so a later `from` can't reach them.
+    expect(pairs(r)).toEqual(Array.from({ length: 10 }, (_, k) => [ts(k + 9), ts(k + 10)]));
     expect(r.notes).toContain(
-      `9 more changes not shown, dated ${[11, 12, 13, 14, 15].map(dateOf).join(", ")} and 4 more; call again with max_changes up to 15 to see more`,
+      `9 more changes not shown, the ones that changed the least copy, dated ${[1, 2, 3, 4, 5].map(dateOf).join(", ")} and 4 more; call again with max_changes up to 15 to see more`,
     );
   });
 
-  it("names the hidden changes' dates and the from= that shows them", async () => {
+  it("at max_changes 15, names a narrower range that shows the first hidden change", async () => {
     // Twenty captures a month apart from 2025-01, each a different copy: nineteen changes.
     const monthly = (i: number) => new Date(Date.UTC(2025, i, 1, 12)).toISOString().replace(/\D/g, "").slice(0, 14);
     const rows = [EARLIEST, ...Array.from({ length: 20 }, (_, i) => ({ timestamp: monthly(i), digest: `D${i}` }))];
     const pages = Object.fromEntries(rows.slice(1).map((r, i) => [r.timestamp, html(`Copy ${String.fromCharCode(65 + i)}`)]));
-    const r = await call({ url: PAGE, from: "2025-01", to: "2026-08" }, fakeArchive({ rows, pages }));
-    expect(r.changes).toHaveLength(10);
-    // The first hidden change is between the 2025-11 and 2025-12 captures.
+    const r = await call({ url: PAGE, from: "2025-01", to: "2026-08", max_changes: 15 }, fakeArchive({ rows, pages }));
+    expect(r.changes).toHaveLength(15);
+    // The hidden changes are the four earliest; the first is between the 2025-01 and 2025-02 captures.
     expect(r.notes).toContain(
-      "9 more changes not shown, dated 2025-12-01, 2026-01-01, 2026-02-01, 2026-03-01, 2026-04-01 and 4 more; call again with from=2025-11 to see them",
+      "4 more changes not shown, the ones that changed the least copy, dated 2025-02-01, 2025-03-01, 2025-04-01, 2025-05-01; call again with a narrower range to see them, such as from=2025-01 to=2025-02 for the first",
     );
   });
 
@@ -143,7 +173,8 @@ describe("page_history: dating changes", () => {
     const fake = fakeArchive(copies((i) => `Copy ${String.fromCharCode(65 + Math.min(i, 16))}`));
     const r = await call({ ...JAN, max_changes: 15 }, fake);
     expect(r.changes).toHaveLength(15);
-    expect(r.notes).toContain(`1 more change not shown, dated ${dateOf(16)}`);
+    // The hidden change is in the range's only month, so no narrower range is named.
+    expect(r.notes).toContain(`1 more change not shown, the one that changed the least copy, dated ${dateOf(1)}`);
   });
 
   it("samples sixteen captures by default before it bisects", async () => {
@@ -584,7 +615,7 @@ describe("page_history: output", () => {
     const r = await call({ ...JAN, max_changes: 15 }, fakeArchive(worstCase()));
     expect(r.changes!.length).toBeGreaterThan(0);
     expect(JSON.stringify(r).length).toBeLessThanOrEqual(20_000);
-    expect(r.notes.some((n) => n.includes("more changes not shown"))).toBe(true);
+    expect(r.notes.some((n) => n.includes("more changes not shown, the ones that changed the least copy"))).toBe(true);
   });
 
   it("renders one line per change", async () => {
