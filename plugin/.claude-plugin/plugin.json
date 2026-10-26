@@ -1,0 +1,25 @@
+{
+  "name": "competitive-analysis",
+  "displayName": "Competitive Analysis",
+  "version": "0.1.0",
+  "description": "Evidence-graded teardown of one company: positioning history, job-listing mining, contradictions, absence as evidence, and a label on every claim.",
+  "author": {
+    "name": "Aaron Roy",
+    "url": "https://aaronroy.com"
+  },
+  "homepage": "https://aaronroy.com/competitive-analysis/",
+  "repository": "https://github.com/amr05008/competitive-analysis",
+  "license": "MIT",
+  "keywords": [
+    "competitive-analysis",
+    "teardown",
+    "due-diligence",
+    "competitor-research",
+    "market-research"
+  ],
+  "icon": "./assets/logo.png",
+  "documentationUrl": "https://aaronroy.com/competitive-analysis/",
+  "supportUrl": "https://aaronroy.com/competitive-analysis/#support",
+  "privacyPolicyUrl": "https://aaronroy.com/competitive-analysis/privacy/",
+  "termsOfServiceUrl": "https://aaronroy.com/competitive-analysis/terms/"
+}

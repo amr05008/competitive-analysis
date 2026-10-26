@@ -2,3 +2,5 @@
 *.zip
 dist/
 /plans
+/local/
+evals/results/

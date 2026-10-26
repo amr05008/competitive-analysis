@@ -16,8 +16,14 @@ Hacker News discussion and SEC filings. The server in `server/` has been live at
   description, release notes). The one place to edit them.
 - `plugin/`: the plugin itself, and the only folder that ships. Everything below it is
   what someone who installs the plugin gets.
-  - `plugin.json`: the portable manifest. Its listing fields are **generated** from the
-    listing file; the rest is edited by hand.
+  - `plugin.json`: the portable manifest, for ChatGPT. Its listing fields are **generated**
+    from the listing file; the rest is edited by hand.
+  - `.claude-plugin/plugin.json`: Claude's manifest. Its `version` and `displayName` will
+    come from the listing file too; the rest is edited by hand.
+  - `mcp.json` (ChatGPT) and `.mcp.json` (Claude): the server, under the key
+    `competitive-analysis`, at its production URL. Only that URL is ever committed.
+  - `README.md`: what Claude's directory shows as the listing, including what the plugin
+    sends and fetches.
   - `skills/teardown/SKILL.md`: the method, written for a model with a browser and
     whatever plugins the user connected.
   - `skills/teardown/references/report-template.md`: **generated** by

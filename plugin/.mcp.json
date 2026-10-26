@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "competitive-analysis": {
+      "type": "http",
+      "url": "https://competitive-analysis.aaronmichaelroy.com/mcp"
+    }
+  }
+}
