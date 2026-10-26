@@ -34,6 +34,8 @@ npm run deploy:staging
 npm run live -- --url https://competitive-analysis-staging.aaronmichaelroy.com/mcp \
   --out ../plans/live-YYYY-MM-DD-staging.json
                     # the same checks, from Cloudflare's network
+npm run deploy:production
+                    # https://competitive-analysis.aaronmichaelroy.com/mcp
 ```
 
 `npm run live` is a client only: it calls a running server's tools with real inputs, prints
@@ -43,6 +45,22 @@ since captures already read are cached. It exits non-zero when a call fails, a r
 match its output schema, or a call takes 30 s or more. It reaches the Wayback Machine, EDGAR,
 Hacker News search and the job boards, so run it sparingly. Its results name real companies,
 so `--out` refuses any path in the repo outside the ignored `plans/` folder.
+
+## Releases
+
+1. `npm test`, then `npm run deploy:staging`.
+2. `npm run live` against staging, as above.
+3. `npm run deploy:production`.
+4. If anything breaks: `npx wrangler rollback --env production`.
+5. After a production deploy that changes tool metadata (names, descriptions, schemas or
+   annotations), request OpenAI's rescan.
+
+Production's address is the one directories register, so it never changes. Its secrets are
+`ARCHIVE_RELAY_TOKEN`, the same value the relay and staging hold, and `DISCORD_WEBHOOK_URL`,
+where the self-check posts failures and the Monday summary. Set each with
+`npx wrangler secret put <NAME> --env production`; without `--env`, Wrangler targets the
+top-level dev Worker and creates it if it doesn't exist. To rotate the relay token, set one new
+value in all three places, then redeploy the relay so it reads the new one.
 
 ## The contract only grows
 
@@ -73,13 +91,16 @@ instead.
   with the `ARCHIVE_RELAY_TOKEN` secret. Dev and tests leave it unset and go direct. An answer
   the relay didn't mark as the archive's is reported as the relay's failure, never as the
   archive's status.
-- `SUBREQUEST_LIMIT` (45) caps each tool call's fetches plus Cache API calls. The free plan
-  counts both against one limit of 50 per request, and a tool that reaches 45 returns what it
-  has as partial, with a note to call again. On the paid plan, raise it to about 900.
+- `SUBREQUEST_LIMIT` caps each tool call's fetches plus Cache API calls, and a tool that
+  reaches it returns what it has as partial, with a note to call again. Dev keeps 45, under the
+  free plan's 50 per request; staging and production set 900 on the paid plan.
 - The daily self-check runs one tool per Cron Trigger, at 13:00, 13:05, 13:10 and 13:15 UTC
   (`SCHEDULE` in `src/selfcheck.ts`), so each invocation stays within its subrequest and CPU
   limits. The Monday usage summary goes with 13:00. The crons belong to production only; any
-  other cron does nothing.
+  other cron does nothing. A test fails if `[env.production.triggers]` and `SCHEDULE` differ.
+- To test a failure alert locally, put `DISCORD_WEBHOOK_URL` and `SELF_CHECK_FORCE_FAIL=1` in
+  `.dev.vars` (git ignores it), run `npx wrangler dev --test-scheduled`, and open
+  `http://localhost:8787/__scheduled?cron=5+13+*+*+*`. The forced failure works only in dev.
 - Cache keys start with the environment's name and a version per source, since staging and
   production share one zone's cache. Bump a source's version when its cached shape changes.
 - The compatibility date (2026-08-15) is the newest the test pool's bundled workerd supports,

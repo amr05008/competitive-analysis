@@ -5,8 +5,8 @@ A ChatGPT/Codex and Claude plugin: **Competitive Analysis**, plugin id
 private `competitive-analysis` skill. The two are separate skills, and the private one keeps
 its name, so `/competitive-analysis` on Aaron's machines still opens the private version.
 Released so far as skills-only (0.1.0, never published). OpenAI stopped taking skills-only
-submissions, so 0.2.0 adds the plugin's own MCP server in `server/`, on staging since
-2026-10-24 and not yet in production. The ChatGPT and Claude versions ship together. Start at § Pick up here in
+submissions, so 0.2.0 adds the plugin's own MCP server in `server/`, in production since
+2026-10-26 at `competitive-analysis.aaronmichaelroy.com`, with staging alongside. The ChatGPT and Claude versions ship together. Start at § Pick up here in
 `plans/next-steps-2026-10-05.md`. Formerly "Worry Or Not" (renamed 2026-10-11); plans and
 session logs keep the old name as history.
 
