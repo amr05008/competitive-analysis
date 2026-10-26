@@ -202,7 +202,7 @@
                       "items": {
                         "type": "string"
                       },
-                      "description": "Prices shown on the page at this capture, each with a few words before it."
+                      "description": "Prices on the page at this capture: currency figures next to a pricing word such as plan, fee, free or per month, each with a few words around it. Funding and revenue figures are left out."
                     }
                   },
                   "required": [
@@ -252,7 +252,7 @@
                       "items": {
                         "type": "string"
                       },
-                      "description": "Prices shown on the page at this capture, each with a few words before it."
+                      "description": "Prices on the page at this capture: currency figures next to a pricing word such as plan, fee, free or per month, each with a few words around it. Funding and revenue figures are left out."
                     }
                   },
                   "required": [

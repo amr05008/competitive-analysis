@@ -114,9 +114,9 @@ describe("cache keys", () => {
     const cache = await caches.open(`wayback-${crypto.randomUUID()}`);
     const page = `https://hightouch.com/pricing?${crypto.randomUUID()}`;
     await fingerprintAt(fake(capture).archive, cache, "20250114231348", page);
-    expect(await cache.match(key(`wayback:v1:fp:https://web.archive.org/web/20250114231348id_/${page}`))).toBeDefined();
+    expect(await cache.match(key(`wayback:v2:fp:https://web.archive.org/web/20250114231348id_/${page}`))).toBeDefined();
     const { archive, calls } = fake("[]");
     await earliestCapture(archive, cache, "hightouch.com/pricing");
-    expect(await cache.match(key(`wayback:v1:cdx:${calls[0].url}`))).toBeDefined();
+    expect(await cache.match(key(`wayback:v2:cdx:${calls[0].url}`))).toBeDefined();
   });
 });

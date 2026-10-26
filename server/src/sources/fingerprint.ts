@@ -9,7 +9,14 @@ export type Fingerprint = {
 
 const SKIP = "script, style, noscript, template, svg";
 const PRICE =
-  /[$€£]\s?\d[\d,]*(?:\.\d{1,2})?(?:\s?[kKmM])?(?:\s?(?:\/|per)\s?(?:month|mo|year|yr|user|seat|member))?/gi;
+  /[$€£]\s?\d[\d,]*(?:\.\d{1,2})?(?:\s?[kKmM]\b)?(?:\s?(?:\/|per)\s?(?:month|mo|year|yr|user|seat|member))?/gi;
+/** A figure is a price only with one of these words within CUE_WORDS of it, or a per-period suffix of its own. */
+const PRICING =
+  /^(?:fees?|setup|pricing|prices?|plans?|per|monthly|months?|mo|annual(?:ly)?|year(?:ly)?|yr|billed|seats?|free|trial|subscriptions?|licen[cs]es?|costs?|charges?|charged|tiers?|starts?|starting|credits?)$/i;
+/** ...and never with one of these within CONTEXT_WORDS: funding banners and revenue dashboards. */
+const NOT_PRICING = /^(?:raises?|raised|raising|funding|funded|valuation|revenue)$/i;
+const CUE_WORDS = 5;
+const CONTEXT_WORDS = 3;
 const MAX_SUBHEADINGS = 3;
 const MAX_PRICES = 8;
 /** Prices are read from this much of a page's body text: a long page's pricing comes early, and the rest costs CPU. */
@@ -35,14 +42,41 @@ function decode(s: string): string {
 
 const squash = (s: string, max: number): string => decode(s).replace(/\s+/g, " ").trim().slice(0, max);
 
+const wordsIn = (s: string) => s.split(/\s+/).filter(Boolean);
+const bare = (word: string) => word.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+/** One amount however it's spaced or cased: "$350 Per month" and "$350/month" are the same. */
+const amountKey = (figure: string) => figure.toLowerCase().replace(/\s+/g, "").replace("per", "/");
+
+/**
+ * Each amount once, in page order, with up to CONTEXT_WORDS words on each side. The context never
+ * reaches a neighbouring figure, so each entry holds exactly one, which copyKey relies on. Words are
+ * read across element boundaries, so a figure just before a pricing sentence can pass as a price.
+ */
 function pricesIn(text: string): string[] {
+  const figures = [...text.matchAll(PRICE)];
   const out: string[] = [];
-  for (const m of text.matchAll(PRICE)) {
-    const before = text.slice(Math.max(0, m.index - 80), m.index).trim().split(/\s+/).filter(Boolean).slice(-3);
-    const words = [...before, m[0].replace(/\s+/g, " ")];
-    while (words.length > 1 && words.join(" ").length > 60) words.shift();
-    const s = words.join(" ").slice(-60);
-    if (!out.includes(s)) out.push(s);
+  const seen = new Set<string>();
+  for (const [i, m] of figures.entries()) {
+    const start = m.index;
+    const end = start + m[0].length;
+    const before = wordsIn(text.slice(Math.max(0, start - 200), start)).map(bare);
+    const after = wordsIn(text.slice(end, end + 200)).map(bare);
+    const cued = /\/|per/i.test(m[0]) || [...before.slice(-CUE_WORDS), ...after.slice(0, CUE_WORDS)].some((w) => PRICING.test(w));
+    const excluded = [...before.slice(-CONTEXT_WORDS), ...after.slice(0, CONTEXT_WORDS)].some((w) => NOT_PRICING.test(w));
+    const amount = amountKey(m[0]);
+    if (!cued || excluded || seen.has(amount)) continue;
+    seen.add(amount);
+
+    const prevEnd = i > 0 ? figures[i - 1].index + figures[i - 1][0].length : 0;
+    const nextStart = i + 1 < figures.length ? figures[i + 1].index : text.length;
+    const lead = wordsIn(text.slice(Math.max(prevEnd, start - 80), start)).slice(-CONTEXT_WORDS);
+    const tail = wordsIn(text.slice(end, Math.min(nextStart, end + 80))).slice(0, CONTEXT_WORDS);
+    const join = () => [...lead, m[0].replace(/\s+/g, " "), ...tail].join(" ");
+    while (join().length > 60 && lead.length + tail.length > 0) {
+      if (lead.length > 0) lead.shift();
+      else tail.pop();
+    }
+    out.push(join().slice(0, 60));
     if (out.length >= MAX_PRICES) break;
   }
   return out;
@@ -142,9 +176,15 @@ export async function extractFingerprint(html: string): Promise<Fingerprint> {
   return { ...fp, readable: Boolean(fp.title || fp.headline || fp.subheadings.length) };
 }
 
-/** A comparison key: two pages with the same key have the same copy, ignoring case and spacing. */
+const ONE_PRICE = new RegExp(PRICE.source, "i");
+
+/**
+ * A comparison key: two pages with the same key have the same copy, ignoring case and spacing.
+ * Prices count by amount only, so a change in the words around one is not a change.
+ */
 export function copyKey(fp: Fingerprint): string {
-  return JSON.stringify([fp.title, fp.description, fp.headline, fp.subheadings, fp.prices])
+  const amounts = fp.prices.map((p) => amountKey(p.match(ONE_PRICE)?.[0] ?? p));
+  return JSON.stringify([fp.title, fp.description, fp.headline, fp.subheadings, amounts])
     .toLowerCase()
     .replace(/\s+/g, " ");
 }

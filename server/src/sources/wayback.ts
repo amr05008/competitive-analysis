@@ -8,8 +8,8 @@ export type CaptureRow = { timestamp: string; digest: string };
 const CDX = "https://web.archive.org/cdx/search/cdx";
 /** The most rows listCaptures asks the index for. */
 export const CDX_LIMIT = 2000;
-/** Starts every cache key; bump the version when a cached shape changes, so old entries are never read. */
-const KEY = "wayback:v1";
+/** Starts every cache key; bump the version when what a cached value holds changes, so old entries are never read. */
+const KEY = "wayback:v2";
 
 /** Rows of a CDX `output=json` answer, minus the header row; null when the body isn't that shape. */
 function parseRows(text: string): CaptureRow[] | null {

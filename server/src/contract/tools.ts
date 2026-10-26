@@ -63,7 +63,11 @@ const snapshot = outputObject({
   title: z.string().describe("The page's title at this capture."),
   headline: z.string().describe("The page's main heading at this capture."),
   subheadings: z.array(z.string()).describe("The page's section headings at this capture."),
-  prices: z.array(z.string()).describe("Prices shown on the page at this capture, each with a few words before it."),
+  prices: z
+    .array(z.string())
+    .describe(
+      "Prices on the page at this capture: currency figures next to a pricing word such as plan, fee, free or per month, each with a few words around it. Funding and revenue figures are left out.",
+    ),
 });
 
 export const pageHistoryOutput = {

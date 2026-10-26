@@ -49,7 +49,43 @@ describe("extractFingerprint", () => {
     const fp = await extractFingerprint(capture);
     expect(fp.readable).toBe(true);
     expect(fp.title).not.toBe("");
-    expect(fp.prices.length).toBeGreaterThan(0);
+    expect(fp.prices.some((p) => p.includes("$350"))).toBe(true);
+    expect(fp.prices.some((p) => p.includes("$0"))).toBe(true);
+  });
+});
+
+describe("extractFingerprint: prices", () => {
+  const prices = async (body: string) => (await extractFingerprint(`<body>${body}</body>`)).prices;
+
+  it("keeps a figure next to a pricing word, with a few words on each side", async () => {
+    expect(await prices("<p>ZeroClick charges a $0 setup fee, no monthly platform fee</p>")).toEqual([
+      "ZeroClick charges a $0 setup fee, no",
+    ]);
+  });
+
+  it("reads a figure followed by a word that starts with k or m", async () => {
+    expect(await prices("<p>Pro has a $10 monthly fee</p>")).toEqual(["Pro has a $10 monthly fee"]);
+  });
+
+  it("leaves out funding, revenue, demo and other figures with no pricing word nearby", async () => {
+    const body =
+      "<nav>Pricing Docs</nav><p>ZeroClick raises $55M to build the ad network</p>" +
+      "<p>Agent transactions 620 Revenue $1.9K</p><p>Nike Air Zoom Pegasus 41 $167.00 5% cash back</p>" +
+      "<p>The company has announced a $55 million raise</p>";
+    expect(await prices(body)).toEqual([]);
+  });
+
+  it("finds a page's price after more than eight other figures", async () => {
+    const demo = Array.from({ length: 10 }, (_, i) => `<p>Seller ${i} earned $${i + 1}K</p>`).join("");
+    expect(await prices(`${demo}<p>Built for startups and enterprises</p><p>Card charges carry a $0.50 minimum</p>`)).toEqual(["charges carry a $0.50 minimum"]);
+  });
+
+  it("lists each amount once, and never shows a second figure as context", async () => {
+    const row = (name: string) => `<p>${name} $0 free forever $350/month</p>`;
+    expect(await prices(row("Data Activation") + row("Data Management"))).toEqual([
+      "Data Activation $0 free forever",
+      "free forever $350/month Data Management",
+    ]);
   });
 });
 
@@ -64,5 +100,12 @@ describe("copyKey", () => {
     expect(copyKey(await extractFingerprint(page("$350/month")))).not.toBe(
       copyKey(await extractFingerprint(page("$400/month"))),
     );
+  });
+
+  it("ignores the words around a price", async () => {
+    const at = (lead: string) => extractFingerprint(`<title>T</title><h1>H</h1><p>${lead} Starter costs $350/month</p>`);
+    const [a, b] = [await at("invite"), await at("AI")];
+    expect(a.prices).not.toEqual(b.prices);
+    expect(copyKey(a)).toBe(copyKey(b));
   });
 });
