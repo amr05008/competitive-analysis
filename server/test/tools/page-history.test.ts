@@ -293,6 +293,43 @@ describe("page_history: budget, deadline and failures", () => {
     expect(r.first_capture?.timestamp).toBe(EARLIEST.timestamp);
   });
 
+  it("skips a listed capture whose replay is a recorded error, as it does an unreadable one", async () => {
+    // zeroclick.ai on 2026-10-26: the index listed 20241202193137 as a 200, but its replay is the domain's
+    // previous owner's 403 page, served with 403 and memento-datetime. It was the first sample read.
+    const fake = fakeArchive({
+      ...copies((i) => (i < 13 ? "Alpha" : "Bravo")),
+      failures: { [ts(0)]: { status: 403, recorded: true } },
+    });
+    const r = await call(JAN, fake);
+    expect(r.status).toBe("ok");
+    expect(pairs(r)).toEqual([[ts(12), ts(13)]]);
+    expect(r.changes![0].resolved).toBe(true);
+    expect(r.notes.join(" ")).not.toContain("archive refused");
+    expect(r.notes.some((n) => n.startsWith("1 capture had no readable copy"))).toBe(true);
+  });
+
+  it("still stops at a 403 without the replay marker, as the archive refusing", async () => {
+    const fake = fakeArchive({
+      ...copies((i) => (i < 13 ? "Alpha" : "Bravo")),
+      failures: { [ts(0)]: { status: 403 } },
+    });
+    const r = await call(JAN, fake);
+    expect(r.status).toBe("partial");
+    expect(r.notes.some((n) => n.includes("archive refused") && n.includes("HTTP 403"))).toBe(true);
+    expect(r.changes).toEqual([]);
+  });
+
+  it("keeps a recorded error capture, so a repeat call doesn't fetch it again", async () => {
+    const data = { ...copies((i) => (i < 13 ? "Alpha" : "Bravo")), failures: { [ts(0)]: { status: 403, recorded: true } } };
+    const cache = await caches.open(`page-history-${crypto.randomUUID()}`);
+    await call(JAN, fakeArchive(data), { cache });
+    const again = fakeArchive(data);
+    const r = await call(JAN, again, { cache });
+    expect(again.calls.some((u) => u.includes(`/web/${ts(0)}id_/`))).toBe(false);
+    expect(r.status).toBe("ok");
+    expect(pairs(r)).toEqual([[ts(12), ts(13)]]);
+  });
+
   it("after a stop, a bracket with nothing unread inside is still resolved", async () => {
     // Six captures, all sampled, read 0, 5, 2, 1, 3, 4; the fifth capture fetch (call 7, capture 3)
     // fails after A (0), C (5), B (2) and A (1) are read. (1,2) has nothing unread inside, so it is

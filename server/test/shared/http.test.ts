@@ -32,6 +32,34 @@ describe("politeFetch", () => {
     }
   });
 
+  it("marks a failed answer that carries memento-datetime as a recorded status", async () => {
+    // The Wayback Machine replays a capture of a page that answered 403 with 403 and this header.
+    const replay = async () => new Response("403 Forbidden", { status: 403, headers: { "memento-datetime": "Mon, 02 Dec 2024 19:31:37 GMT" } });
+    expect(await politeFetch(replay, "https://a.com/")).toMatchObject({
+      ok: false,
+      reason: "source_unavailable",
+      status: 403,
+      recorded: true,
+    });
+  });
+
+  it("doesn't mark a 200 replay whose body fails to read as recorded", async () => {
+    // A recorded failure is kept as an unreadable capture for good, so a passing fault must never be one.
+    const body = new ReadableStream({ pull: (c) => c.error(new TypeError("connection reset")) });
+    const r = await politeFetch(
+      async () => new Response(body, { status: 200, headers: { "memento-datetime": "Fri, 14 Nov 2025 16:48:40 GMT" } }),
+      "https://a.com/",
+    );
+    expect(r).toMatchObject({ ok: false, reason: "source_unavailable" });
+    expect("recorded" in r).toBe(false);
+  });
+
+  it("doesn't mark a failed answer without memento-datetime as recorded", async () => {
+    const r = await politeFetch(respond("", 403), "https://a.com/");
+    expect(r).toMatchObject({ ok: false, status: 403 });
+    expect("recorded" in r).toBe(false);
+  });
+
   it("maps a network error", async () => {
     const r = await politeFetch(async () => { throw new TypeError("boom"); }, "https://a.com/");
     expect(r).toMatchObject({ ok: false, reason: "source_unavailable" });

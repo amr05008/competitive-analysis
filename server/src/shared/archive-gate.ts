@@ -7,6 +7,8 @@ import { politeFetch, REFUSED_STATUS, type ArchiveFetch, type FailedOutcome, typ
  * is a plain failure, not a refusal.
  */
 function isRefusal(out: FailedOutcome): boolean {
+  // A replayed capture's own status is the archived page's answer, never the archive turning us away.
+  if (out.recorded) return false;
   return out.reason === "source_rate_limited" || out.status === 503 || out.detail.startsWith("connection failed");
 }
 

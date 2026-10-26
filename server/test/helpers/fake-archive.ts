@@ -13,16 +13,20 @@ const RAW_CAPTURE = /^https:\/\/web\.archive\.org\/web\/(\d{14})id_\//;
  * it asks for limit=1. A raw capture answers with `pages[timestamp]`, or HTTP
  * 404 when there's no page for that timestamp. The `failAt`-th call (counting
  * from 1, CDX queries included) answers HTTP 429 instead; calls after it
- * answer normally, so a retry would show up as an extra call.
+ * answer normally, so a retry would show up as an extra call. A raw capture
+ * in `failures` answers that failure instead of its page: `recorded` is the
+ * archive replaying a page that answered with that status when archived.
  */
 export function fakeArchive({
   rows,
   pages,
   failAt,
+  failures = {},
 }: {
   rows: CaptureRow[];
   pages: Record<string, string>;
   failAt?: number;
+  failures?: Record<string, { status: number; recorded?: boolean }>;
 }): FakeArchive {
   const calls: string[] = [];
   const ok = (url: string, text: string): FetchOutcome => ({ ok: true, status: 200, url, text, truncated: false });
@@ -39,6 +43,12 @@ export function fakeArchive({
       return ok(url, JSON.stringify([["timestamp", "digest"], ...found.map((r) => [r.timestamp, r.digest])]));
     }
     const ts = RAW_CAPTURE.exec(url)?.[1];
+    const failure = ts === undefined ? undefined : failures[ts];
+    if (failure) {
+      const { status, recorded } = failure;
+      const reason = status === 429 ? "source_rate_limited" : status === 404 ? "not_found" : "source_unavailable";
+      return { ok: false, reason, status, url, detail: `HTTP ${status}`, ...(recorded ? { recorded: true } : {}) };
+    }
     const page = ts === undefined ? undefined : pages[ts];
     if (page === undefined) return { ok: false, reason: "not_found", status: 404, url, detail: "HTTP 404" };
     return ok(url, page);

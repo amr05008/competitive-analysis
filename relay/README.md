@@ -9,8 +9,10 @@ through it, and it never goes in the plugin zip.
 
 `POST /api/archive` with `{ "url": "https://web.archive.org/..." }` and
 `authorization: Bearer <ARCHIVE_RELAY_TOKEN>`. It makes one GET with the caller's user agent,
-follows no redirects, and returns the archive's status, `location`, `content-type` and body,
-with `x-archive-relay: archive`.
+follows no redirects, and returns the archive's status, `location`, `content-type`,
+`memento-datetime` and body, with `x-archive-relay: archive`. `memento-datetime` marks a
+replayed capture, so the server can tell a capture of a page that failed when it was
+archived from the archive refusing a request.
 
 - Without the token, or for anything but a POST, it answers a plain 404.
 - It fetches only the CDX index (`/cdx/search/cdx`) and raw captures (`/web/<timestamp>id_/...`).

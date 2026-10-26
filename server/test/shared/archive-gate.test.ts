@@ -132,6 +132,18 @@ describe("ArchiveGate", () => {
     });
   });
 
+  it.each([429, 503])("a replayed capture's recorded %i isn't a refusal, so nothing pauses", async (status) => {
+    const h = harness();
+    const first = h.gate.run(A);
+    await h.reached(1);
+    h.calls[0].respond(new Response("", { status, headers: { "memento-datetime": "Mon, 02 Dec 2024 19:31:37 GMT" } }));
+    expect(await first).toMatchObject({ ok: false, status, recorded: true });
+    const next = h.gate.run(B);
+    await h.reached(2);
+    h.calls[1].respond(new Response("ok"));
+    expect(await next).toMatchObject({ ok: true, url: B });
+  });
+
   it("calls already waiting behind a refusal don't fetch", async () => {
     const h = harness();
     const first = h.gate.run(A);

@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 
 /**
  * The header on every answer the relay sends to a caller with the token. "archive" means the status,
- * location, type and body are the archive's own. Anything else is the relay's: "refused" (an address it
+ * location, type, memento-datetime and body are the archive's own. Anything else is the relay's: "refused" (an address it
  * won't fetch), "unreachable" (no connection to the archive), "timeout", or "error".
  */
 export const MARK = "x-archive-relay";
@@ -78,7 +78,8 @@ function capped(body: ReadableStream<Uint8Array>, maxBytes: number): ReadableStr
 /**
  * One archive request for the Competitive Analysis server, whose own network the archive refuses. The
  * caller POSTs `{ "url": ... }` with the token; the relay makes one GET, follows no redirects, and hands
- * back the archive's status, location, content type and body, marked. Without the token, it's a 404.
+ * back the archive's status, location, content type, memento-datetime and body, marked. Without the
+ * token, it's a 404.
  */
 export async function handle(req: Request, config: RelayConfig): Promise<Response> {
   try {
@@ -105,7 +106,8 @@ export async function handle(req: Request, config: RelayConfig): Promise<Respons
     }
 
     const out = new Headers({ [MARK]: "archive" });
-    for (const name of ["content-type", "location"]) {
+    // memento-datetime marks a replayed capture, whose status is the archived page's own, not the archive's.
+    for (const name of ["content-type", "location", "memento-datetime"]) {
       const value = upstream.headers.get(name);
       if (value) out.set(name, value);
     }

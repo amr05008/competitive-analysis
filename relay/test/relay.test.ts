@@ -131,6 +131,16 @@ describe("what the relay answers", () => {
     expect(await res.text()).toBe("<html>page</html>");
   });
 
+  it("passes memento-datetime through, which marks a replayed capture's own status", async () => {
+    // A capture of a page that answered 403 when it was archived replays with 403 and this header.
+    const when = "Mon, 02 Dec 2024 19:31:37 GMT";
+    const a = archive(() => new Response("403 Forbidden", { status: 403, headers: { "memento-datetime": when } }));
+    const res = await handle(ask({ url: CAPTURE }), config(a.fetcher));
+    expect(res.status).toBe(403);
+    expect(res.headers.get(MARK)).toBe("archive");
+    expect(res.headers.get("memento-datetime")).toBe(when);
+  });
+
   it("passes a redirect through with its location", async () => {
     const to = "https://web.archive.org/web/20250601123456id_/https://example.com/";
     const a = archive(() => new Response(null, { status: 302, headers: { location: to } }));

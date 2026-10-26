@@ -96,6 +96,9 @@ export async function fingerprintAt(
   let failure: FailedOutcome | null = null;
   const { value, hit } = await cached<Fingerprint>(cache, `${KEY}:fp:${rawUrl}`, TTL_FINGERPRINT, async () => {
     const res = await archive(rawUrl, { maxBytes: CAPTURE_MAX_BYTES });
+    // A capture of a page that failed when it was archived replays with that status: it has no copy to
+    // read, for good, so it's kept as an unreadable capture rather than read as the archive refusing.
+    if (!res.ok && res.recorded) return extractFingerprint("");
     if (!res.ok) {
       failure = res;
       return null;

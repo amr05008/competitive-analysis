@@ -72,6 +72,17 @@ describe("relayFetcher", () => {
     expect(await politeFetch(fetcher, MOVED)).toMatchObject({ ok: false, reason: "source_rate_limited" });
   });
 
+  it("keeps a replayed capture's recorded status recorded, through the relay", async () => {
+    const r = relay({
+      [CAPTURE]: () => fromArchive("403 Forbidden", { status: 403, headers: { "memento-datetime": "Mon, 02 Dec 2024 19:31:37 GMT" } }),
+    });
+    expect(await politeFetch(relayFetcher(RELAY, TOKEN, r.fetcher), CAPTURE)).toMatchObject({
+      ok: false,
+      status: 403,
+      recorded: true,
+    });
+  });
+
   it("reports an unmarked answer as the relay's failure, never as the archive's status", async () => {
     // What a wrong token, a missing deploy or a paused project looks like: a plain 404.
     const r = relay({});

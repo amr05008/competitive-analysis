@@ -4,9 +4,13 @@ import { isPublicHost } from "./inputs";
 
 export type Fetcher = typeof fetch;
 
+/**
+ * `recorded` on a failure means the status is a replayed capture's own: the Wayback Machine serving a page
+ * that answered that way when it was archived (it sends memento-datetime), not the archive refusing.
+ */
 export type FetchOutcome =
   | { ok: true; status: number; url: string; text: string; truncated: boolean }
-  | { ok: false; reason: ErrorReason; status?: number; url: string; detail: string };
+  | { ok: false; reason: ErrorReason; status?: number; url: string; detail: string; recorded?: true };
 
 export type FailedOutcome = Extract<FetchOutcome, { ok: false }>;
 
@@ -59,12 +63,14 @@ export async function politeFetch(
     timedOut = true;
     controller.abort();
   }, timeoutMs);
+  let recorded = false;
   const fail = (reason: ErrorReason, detail: string, status?: number): FetchOutcome => ({
     ok: false,
     reason,
     url: finalUrl,
     detail,
     ...(status === undefined ? {} : { status }),
+    ...(recorded ? { recorded: true as const } : {}),
   });
   try {
     const headers: Record<string, string> = { "user-agent": USER_AGENT };
@@ -88,6 +94,8 @@ export async function politeFetch(
       current = next.toString();
     }
     finalUrl = current;
+    // Only a failed status can be recorded: a body that fails to read after a 200 is a fetch failure.
+    recorded = !res.ok && res.headers.has("memento-datetime");
     if (res.status === 429) {
       await dropBody(res);
       return fail("source_rate_limited", "HTTP 429", 429);
