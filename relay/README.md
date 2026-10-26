@@ -37,6 +37,7 @@ npm run typecheck
 - `ARCHIVE_RELAY_TOKEN`: at least 32 characters (`openssl rand -hex 32`), set as a Vercel
   environment variable and, with the same value, as a Worker secret
   (`wrangler secret put ARCHIVE_RELAY_TOKEN --env <env>`). Under 32 characters or unset, the
-  relay refuses everyone. Never in git.
+  relay refuses everyone. Never in git. A changed token takes effect only after a redeploy:
+  `npx vercel@65.2.0 deploy --prod` in this folder.
 - The server uses the relay where its environment sets `ARCHIVE_RELAY_URL`; elsewhere it goes
   to the archive directly.

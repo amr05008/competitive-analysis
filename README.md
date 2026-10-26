@@ -6,8 +6,9 @@ company. The method comes from the `competitive-analysis` skill in
 it for the plugin directories. The ChatGPT and Claude versions ship together.
 
 Version 0.2.0 adds the plugin's own MCP server, with tools for page history, job boards,
-Hacker News discussion and SEC filings. The server is built and tested in `server/` but
-not deployed yet.
+Hacker News discussion and SEC filings. The server in `server/` has been live at
+`competitive-analysis.aaronmichaelroy.com` since 2026-10-26; the skill starts using it in
+0.2.0.
 
 ## Layout
 
