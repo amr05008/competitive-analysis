@@ -16,18 +16,31 @@ session logs keep the old name as history.
   desktop app's personal marketplace (`~/.agents/plugins/marketplace.json`) resolves plugin
   paths relative to the home folder and will not follow symlinks.
   `~/repos/competitive-analysis` is a symlink here. Do not move the directory without
-  updating `marketplace.json`, whose entry points at `plugin/`.
+  updating `marketplace.json`, whose entry points at `dist/chatgpt-local`, the build's local
+  ChatGPT folder.
 - **`plugin/` is the plugin**: the folder Claude's directory lists (Decision 1, 2026-10-26),
-  and all that people who install it get. It holds `plugin.json`, `LICENSE` (a copy of the
-  root one, which the build checks), `skills/` and `assets/`. The server, relay, scripts and
-  listing stay outside it, so the directory never scans or ships them.
+  and all that people who install it get. It holds both hosts' files: `plugin.json` and
+  `mcp.json` (ChatGPT), `.claude-plugin/plugin.json` and `.mcp.json` (Claude), `README.md`
+  (the Claude listing's description), `LICENSE` (a copy of the root one, which the build
+  checks), `skills/` and `assets/`. The server, relay, scripts and listing stay outside it,
+  so the directory never scans or ships them.
+- **Only the production URL is ever committed** in the two MCP files, under the server key
+  `competitive-analysis`. `--server staging` swaps the URL in `dist/` only, and the build
+  fails if `plugin/` carries any other URL.
+- `scripts/package.py`, run by `build.sh`, writes each host's package from `plugin/` and
+  checks it, and checks `plugin/` against the directory's file limits. Production writes the
+  OpenAI upload zip and the Claude zip; both builds write `dist/chatgpt-local/` (what the
+  ChatGPT app installs) and `dist/claude-local/` (for `claude --plugin-dir`, plus `evals/`
+  when it exists). `local/` (git-ignored) holds Aaron's ChatGPT app mappings,
+  `local/chatgpt-app-<server>.json`, which go into `dist/chatgpt-local/` and nowhere else.
 - The method's source of truth is the `competitive-analysis` skill in the private
   `claude-channels` repo, mirrored publicly to `amr05008/agent-skills`.
   `plugin/skills/teardown/references/report-template.md` is **generated** by
   `scripts/build.sh` from the agent-skills checkout. Never edit it here.
 - The store listing's source is `listing/competitive-analysis-listing.md`: version, name,
   subtitle, category and prompts in its frontmatter, the description and release notes in its
-  body. `scripts/build.sh` (via `scripts/listing.py`) copies them into `plugin/plugin.json`,
+  body. `scripts/build.sh` (via `scripts/listing.py`) copies them into `plugin/plugin.json`
+  (and `version` and `displayName` into `plugin/.claude-plugin/plugin.json`),
   checks the directory's limits, the plugin id and vendor names in `plugin/skills/`, and zips
   the package into `dist/`. Never hand-edit `version`, `displayName`, `shortDescription`,
   `longDescription`, `category`, `defaultPrompt` or `publication.release_notes` in
@@ -72,9 +85,19 @@ session logs keep the old name as history.
 ## Test loop
 
 1. Edit `plugin/skills/teardown/SKILL.md`.
-2. Quit the ChatGPT desktop app (Cmd+Q), reopen, Plugins → "Aaron's local plugins" →
-   reinstall if offered.
+2. `sh scripts/build.sh --server staging`, then quit the ChatGPT desktop app (Cmd+Q),
+   reopen, Plugins → "Aaron's local plugins" → reinstall if offered. The app installs
+   `dist/chatgpt-local`, so an edit reaches it only through a build.
 3. New chat, no @-mention: `Should we worry about ZeroClick? zeroclick.ai`. Runs so far are
    Codex chats in the app (share links `chatgpt.com/s/cx_...`). Note whether Exa is on.
 4. Score against `plans/next-steps-2026-10-05.md` § Scoring, which also covers the Claude
    Code reference teardown and how to read share links (Chrome; WebFetch gets 403).
+
+The Claude loop uses the same staging build:
+- **claude.ai:** in **Customize > Plugins**, remove the old upload, upload
+  `dist/competitive-analysis-<version>-claude-staging.zip`, connect it on the plugin's
+  **Connectors** tab, then start a new chat.
+- **Claude Code:** `claude --plugin-dir dist/claude-local`. Remove the user-scope
+  `competitive-analysis-staging` server first, or the tools appear twice. A plain teardown
+  prompt loads Aaron's private `competitive-analysis` skill instead, so park that skill or
+  name the tools.

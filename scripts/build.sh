@@ -1,6 +1,11 @@
 #!/bin/sh
-# Build the upload: pull the report contract, copy the store listing into plugin.json,
-# check both, and zip the package into dist/.
+# Build the packages: pull the report contract, copy the store listing into the manifests,
+# check both, and write each host's package into dist/ (see scripts/package.py).
+#
+#   sh scripts/build.sh                     production: the OpenAI upload zip, the Claude zip,
+#                                           dist/chatgpt-local/ and dist/claude-local/
+#   sh scripts/build.sh --server staging    the two local folders and a Claude zip, all
+#                                           pointed at staging; no OpenAI upload zip
 #
 # The plugin lives in plugin/, the folder Claude's directory lists (Decision 1, 2026-10-26).
 # plugin/skills/teardown/references/report-template.md is generated; edit the source in
@@ -10,6 +15,17 @@
 set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PLUGIN="$ROOT/plugin"
+
+SERVER=production
+case "$#:${1:-}" in
+  0:) ;;
+  2:--server) SERVER="$2" ;;
+  *) echo "usage: sh scripts/build.sh [--server production|staging]" >&2; exit 2 ;;
+esac
+case "$SERVER" in
+  production|staging) ;;
+  *) echo "build: --server must be production or staging" >&2; exit 2 ;;
+esac
 
 # 1. Report template. The private skill's template names its paid sources; the packaged
 # copy drops them, because vendor names never go in a model-readable file. If the source
@@ -26,29 +42,26 @@ OUT="$PLUGIN/skills/teardown/references/report-template.md"
 } > "$OUT"
 echo "build: wrote $OUT from agent-skills@$SHA"
 
-# 2. Listing into plugin.json, with the limit, vendor and plugin-id checks.
+# 2. Listing into the manifests, with the limit, vendor and plugin-id checks.
 python3 "$ROOT/scripts/listing.py"
 
 # The plugin folder carries its own copy of the license, because installers get only
 # that folder. It must match the repo's.
 cmp -s "$ROOT/LICENSE" "$PLUGIN/LICENSE" || { echo "build: plugin/LICENSE differs from LICENSE; copy it again" >&2; exit 6; }
 
-# 3. Zip. A version that's already tagged was already uploaded, so it can't be rebuilt
-# from different files: bump the version in the listing instead.
+# 3. Packages. A version that's already tagged was already uploaded, so its upload zip
+# can't be rebuilt from different files: bump the version in the listing instead. Staging
+# writes no upload zip, so the tag doesn't apply to it.
 VERSION=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$PLUGIN/plugin.json")
 TAG="v$VERSION"
-if git -C "$ROOT" rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+if [ "$SERVER" = production ] && git -C "$ROOT" rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
   if [ "$(git -C "$ROOT" rev-parse "$TAG^{commit}")" != "$(git -C "$ROOT" rev-parse HEAD)" ] \
      || [ -n "$(git -C "$ROOT" status --porcelain -- plugin)" ]; then
     echo "build: $TAG was already uploaded; bump the version in the listing" >&2
     exit 4
   fi
 fi
-mkdir -p "$ROOT/dist"
-ZIP="$ROOT/dist/competitive-analysis-$VERSION.zip"
-rm -f "$ZIP"
-(cd "$PLUGIN" && zip -rqX "$ZIP" plugin.json LICENSE skills assets -x '*.DS_Store')
-echo "build: wrote $ZIP"
-if [ -n "$(git -C "$ROOT" status --porcelain -- plugin LICENSE listing)" ]; then
+python3 "$ROOT/scripts/package.py" --server "$SERVER"
+if [ "$SERVER" = production ] && [ -n "$(git -C "$ROOT" status --porcelain -- plugin LICENSE listing)" ]; then
   echo "build: uncommitted changes; commit before uploading so tag $TAG matches the zip"
 fi

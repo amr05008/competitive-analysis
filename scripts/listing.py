@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Copy the store listing into plugin.json and check it against the directory's rules.
 
+Claude's manifest, .claude-plugin/plugin.json, gets the same version and display name; the
+rest of it is edited by hand.
+
 listing/competitive-analysis-listing.md is the one place the listing is edited (in Obsidian,
 through a vault symlink). Its frontmatter holds the short fields, the body's "## Description"
 is the long description, and the newest "### <version>" under "## Release notes" goes out as
@@ -17,6 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PLUGIN = ROOT / "plugin"  # the folder Claude's directory lists (Decision 1, 2026-10-26)
 LISTING = Path(os.environ.get("LISTING", ROOT / "listing" / "competitive-analysis-listing.md"))
 MANIFEST = PLUGIN / "plugin.json"
+CLAUDE_MANIFEST = PLUGIN / ".claude-plugin" / "plugin.json"  # gets version and displayName only
 PLUGIN_ID = "competitive-analysis"  # fixed for the life of the listing
 # Vendor names belong in the listing and on the site, never in a model-readable file.
 VENDORS = ["Clay", "Exa", "Firecrawl", "Monid"]
@@ -163,18 +167,20 @@ def main():
     errors += vendor_mentions()
 
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    if manifest.get("name") != PLUGIN_ID:
-        errors.append(f"plugin.json name is {manifest.get('name')!r}; the plugin id must stay {PLUGIN_ID!r}")
+    claude = json.loads(CLAUDE_MANIFEST.read_text(encoding="utf-8"))
+    for path, m in ((MANIFEST, manifest), (CLAUDE_MANIFEST, claude)):
+        if m.get("name") != PLUGIN_ID:
+            errors.append(f"{path.relative_to(PLUGIN)} name is {m.get('name')!r}; the plugin id must stay {PLUGIN_ID!r}")
 
     if errors:
-        print(f"listing: {LISTING.name} not copied into plugin.json:", file=sys.stderr)
+        print(f"listing: {LISTING.name} not copied into the manifests:", file=sys.stderr)
         for e in errors:
             print(f"  - {e}", file=sys.stderr)
         sys.exit(1)
 
     openai = manifest["extensions"]["com.openai"]
     iface = openai["interface"]
-    before = json.dumps(manifest, sort_keys=True)
+    before = {MANIFEST: json.dumps(manifest, sort_keys=True), CLAUDE_MANIFEST: json.dumps(claude, sort_keys=True)}
     manifest["version"] = version
     iface["displayName"] = meta["name"]
     iface["shortDescription"] = meta["subtitle"]
@@ -182,11 +188,15 @@ def main():
     iface["category"] = meta["category"]
     iface["defaultPrompt"] = prompts
     openai.setdefault("publication", {})["release_notes"] = release_notes
-    if json.dumps(manifest, sort_keys=True) == before:
-        print(f"listing: plugin.json already matches {LISTING.name} ({version})")
-    else:
-        MANIFEST.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        print(f"listing: wrote plugin.json from {LISTING.name} ({version})")
+    claude["version"] = version
+    claude["displayName"] = meta["name"]
+    for path, m in ((MANIFEST, manifest), (CLAUDE_MANIFEST, claude)):
+        rel = path.relative_to(PLUGIN)
+        if json.dumps(m, sort_keys=True) == before[path]:
+            print(f"listing: {rel} already matches {LISTING.name} ({version})")
+        else:
+            path.write_text(json.dumps(m, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            print(f"listing: wrote {rel} from {LISTING.name} ({version})")
 
 
 if __name__ == "__main__":

@@ -18,8 +18,8 @@ Hacker News discussion and SEC filings. The server in `server/` has been live at
   what someone who installs the plugin gets.
   - `plugin.json`: the portable manifest, for ChatGPT. Its listing fields are **generated**
     from the listing file; the rest is edited by hand.
-  - `.claude-plugin/plugin.json`: Claude's manifest. Its `version` and `displayName` will
-    come from the listing file too; the rest is edited by hand.
+  - `.claude-plugin/plugin.json`: Claude's manifest. Its `version` and `displayName` come
+    from the listing file too; the rest is edited by hand.
   - `mcp.json` (ChatGPT) and `.mcp.json` (Claude): the server, under the key
     `competitive-analysis`, at its production URL. Only that URL is ever committed.
   - `README.md`: what Claude's directory shows as the listing, including what the plugin
@@ -31,7 +31,9 @@ Hacker News discussion and SEC filings. The server in `server/` has been live at
   - `assets/`: icon and logo.
   - `LICENSE`: a copy of the root `LICENSE`; the build checks that they match.
 - `scripts/build.sh`: regenerates the two generated files, checks the listing limits and
-  vendor names, and writes `dist/competitive-analysis-<version>.zip`.
+  vendor names, and has `scripts/package.py` write and check each host's package in
+  `dist/`: the OpenAI upload zip, the Claude zip, and local test folders for both apps.
+  `--server staging` builds the test folders against the staging server.
 - `server/`: the MCP server, a Cloudflare Worker. Public code, and it never goes in the
   zip. See [`server/README.md`](server/README.md).
 - `relay/`: a Vercel Function that makes the server's Wayback Machine requests, because the
