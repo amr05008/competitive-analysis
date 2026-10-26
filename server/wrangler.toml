@@ -52,3 +52,24 @@ ARCHIVE_RELAY_URL = "https://competitive-analysis-relay.vercel.app/api/archive"
 [[env.staging.durable_objects.bindings]]
 name = "LIMITS"
 class_name = "Limits"
+
+# The permanent address directories register; it can't change later.
+# DISCORD_WEBHOOK_URL and ARCHIVE_RELAY_TOKEN are secrets.
+[env.production]
+name = "competitive-analysis"
+routes = [{ pattern = "competitive-analysis.aaronmichaelroy.com", custom_domain = true }]
+
+[env.production.vars]
+ENVIRONMENT = "production"
+DAILY_TOOL_CALL_CAP = "1000"
+SUBREQUEST_LIMIT = "900"
+ARCHIVE_RELAY_URL = "https://competitive-analysis-relay.vercel.app/api/archive"
+
+[[env.production.durable_objects.bindings]]
+name = "LIMITS"
+class_name = "Limits"
+
+# One self-check tool per run, with the Monday usage summary on the first.
+# These strings must match SCHEDULE in src/selfcheck.ts exactly.
+[env.production.triggers]
+crons = ["0 13 * * *", "5 13 * * *", "10 13 * * *", "15 13 * * *"]

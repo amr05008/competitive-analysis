@@ -7,6 +7,7 @@ import type { runTool } from "../src/mcp";
 import { SCHEDULE, SELF_CHECKS, runScheduled, runSelfCheck, weeklySummary } from "../src/selfcheck";
 import { USER_AGENT } from "../src/config";
 import { postDiscord } from "../src/discord";
+import wranglerToml from "../wrangler.toml?raw";
 
 const NOW = Date.parse("2026-10-24T06:00:00Z"); // a Saturday
 const MONDAY = Date.parse("2026-10-26T06:00:00Z");
@@ -102,6 +103,15 @@ describe("SELF_CHECKS", () => {
     const check = SELF_CHECKS[0]!;
     expect(check.pass({ ...PASSING.page_history, captures_in_range: 0 } as ToolResult)).not.toBeNull();
     expect(check.pass({ ...PASSING.page_history, status: "error" } as ToolResult)).not.toBeNull();
+  });
+});
+
+describe("SCHEDULE", () => {
+  it("matches the production cron triggers in wrangler.toml exactly", () => {
+    const block = /\[env\.production\.triggers\]\s*crons\s*=\s*\[([^\]]*)\]/.exec(wranglerToml);
+    expect(block, "no crons under [env.production.triggers]").not.toBeNull();
+    const crons = [...block![1].matchAll(/"([^"]*)"/g)].map((m) => m[1]);
+    expect(crons).toEqual([...SCHEDULE.keys()]);
   });
 });
 
