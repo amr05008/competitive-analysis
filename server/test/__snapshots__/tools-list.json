@@ -141,6 +141,14 @@
                   "link": {
                     "type": "string",
                     "description": "A link to the capture on the Wayback Machine."
+                  },
+                  "title": {
+                    "description": "The page's title at its earliest capture, when that capture could be read: it says who held the address then.",
+                    "type": "string"
+                  },
+                  "headline": {
+                    "description": "The page's main heading at its earliest capture, when that capture could be read.",
+                    "type": "string"
                   }
                 },
                 "required": [

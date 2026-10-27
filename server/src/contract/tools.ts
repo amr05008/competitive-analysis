@@ -81,7 +81,14 @@ export const pageHistoryOutput = {
   })
     .optional()
     .describe("The months that were searched."),
-  first_capture: outputObject(captureFields)
+  first_capture: outputObject({
+    ...captureFields,
+    title: z
+      .string()
+      .optional()
+      .describe("The page's title at its earliest capture, when that capture could be read: it says who held the address then."),
+    headline: z.string().optional().describe("The page's main heading at its earliest capture, when that capture could be read."),
+  })
     .nullable()
     .optional()
     .describe("The page's earliest capture on the Wayback Machine, or null when it couldn't be read."),

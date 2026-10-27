@@ -372,6 +372,18 @@ export async function pageHistory(
   if (!captures.length) notes.push(`no captures of this page between ${range.from} and ${range.to}`);
 
   const search = await findChanges(captures, page.url, deps.cache, archive, budget, sampleSize);
+
+  // The first capture's own copy, so whoever held the address then can be told without opening it. It's
+  // read only when the search finished, with what's left of the budget, and cached like any capture.
+  let firstCopy: Fingerprint | null = null;
+  if (firstCapture && !search.stop) {
+    const gated: ArchiveFetch = (u, o) =>
+      budget.take()
+        ? archive(u, o)
+        : Promise.resolve({ ok: false, reason: "server_busy", status: REFUSED_STATUS, url: u, detail: "out of fetches or time" });
+    const r = await fingerprintAt(gated, deps.cache, firstCapture.timestamp, page.url);
+    if (r.ok && r.fp.readable) firstCopy = r.fp;
+  }
   const fpAt = (i: number) => (search.reads[i] as { fp: Fingerprint }).fp;
 
   if (search.stop) notes.push(stopNote(search.stop, maxFetches, budget.timeLimitMs, deps.subrequests.limit));
@@ -445,7 +457,10 @@ export async function pageHistory(
       retrieved_at: utcDay(deps.now()),
       url: page.url,
       range: { from: range.from, to: range.to },
-      first_capture: firstCapture,
+      first_capture:
+        firstCapture && firstCopy
+          ? { ...firstCapture, title: clip(firstCopy.title, LEVELS[level].text), headline: clip(firstCopy.headline, LEVELS[level].text) }
+          : firstCapture,
       captures_in_range: captures.length,
       changes: kept.map((b) => {
         const before = captures[b.i];
@@ -510,7 +525,7 @@ export function renderPageHistory(r: PageHistoryResult): string {
   const lines = [
     `Page history of ${r.url} from ${r.range?.from} to ${r.range?.to} (${r.status})`,
     ...r.notes.map((n) => `note: ${n}`),
-    first ? `first captured ${first.date}: ${first.link}` : "first capture: unknown",
+    first ? `first captured ${first.date}${first.title || first.headline ? ` ("${first.title || first.headline}")` : ""}: ${first.link}` : "first capture: unknown",
     `${plural(r.captures_in_range ?? 0, "capture")} in range, ${plural(changes.length, "change")} shown, ${plural(r.fetches_used ?? 0, "archive request")}`,
     ...changes.map(changeLine),
   ];

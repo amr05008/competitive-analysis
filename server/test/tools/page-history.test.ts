@@ -99,9 +99,9 @@ describe("page_history: dating changes", () => {
     expect(c.before.headline).toBe("Plans for Alpha");
     expect(c.after.headline).toBe("Plans for Bravo");
     expect(r.captures_in_range).toBe(20);
-    // Two index queries, eight samples, then captures 12 and 13.
-    expect(fake.calls).toHaveLength(12);
-    expect(r.fetches_used).toBe(12);
+    // Two index queries, eight samples, captures 12 and 13, then the first capture's copy.
+    expect(fake.calls).toHaveLength(13);
+    expect(r.fetches_used).toBe(13);
   });
 
   it("finds two changes between one sampled pair", async () => {
@@ -183,7 +183,8 @@ describe("page_history: dating changes", () => {
     const fake = fakeArchive(copies(() => "Alpha", 31));
     const r = await callDefault(JAN, fake);
     expect(r.status).toBe("ok");
-    expect(r.fetches_used).toBe(2 + 16);
+    // Two index queries, sixteen samples, and the first capture's copy.
+    expect(r.fetches_used).toBe(2 + 16 + 1);
   });
 
   it("bisects between sixteen samples, earliest bracket first", async () => {
@@ -196,9 +197,13 @@ describe("page_history: dating changes", () => {
       [ts(6), ts(7), true],
       [ts(22), ts(23), true],
     ]);
-    expect(r.fetches_used).toBe(2 + 16 + 2);
-    // Both bisection reads come after every sample, the earlier bracket's first.
-    expect(fake.calls.slice(-2)).toEqual([expect.stringContaining(`/web/${ts(7)}id_/`), expect.stringContaining(`/web/${ts(23)}id_/`)]);
+    expect(r.fetches_used).toBe(2 + 16 + 2 + 1);
+    // Both bisection reads come after every sample, the earlier bracket's first; the first capture's copy is read last.
+    expect(fake.calls.slice(-3)).toEqual([
+      expect.stringContaining(`/web/${ts(7)}id_/`),
+      expect.stringContaining(`/web/${ts(23)}id_/`),
+      expect.stringContaining(`/web/${EARLIEST.timestamp}id_/`),
+    ]);
   });
 
   it.each([
@@ -435,7 +440,8 @@ describe("page_history: budget, deadline and failures", () => {
       return fake(url, opts);
     };
     await call(JAN, watched);
-    expect(seen.length).toBe(12);
+    // Twelve requests for the search, then the first capture's copy.
+    expect(seen.length).toBe(13);
     expect(new Set(seen)).toEqual(new Set([NOW + 22_000]));
   });
 
@@ -547,7 +553,9 @@ describe("page_history: unreadable captures", () => {
 
 describe("page_history: caching and inputs", () => {
   it("repeat calls cost the archive nothing", async () => {
-    const data = copies((i) => (i <= 8 ? "Alpha" : i <= 10 ? "Bravo" : "Charlie"));
+    const changing = copies((i) => (i <= 8 ? "Alpha" : i <= 10 ? "Bravo" : "Charlie"));
+    // A first capture that answers 404 isn't cached, any more than an in-range one is, so this one reads.
+    const data = { ...changing, pages: { ...changing.pages, [EARLIEST.timestamp]: html("Earliest") } };
     const cache = await caches.open(`page-history-${crypto.randomUUID()}`);
     const first = await call(JAN, fakeArchive(data), { cache });
     const again: FakeArchive = fakeArchive(data);
@@ -697,6 +705,63 @@ describe("page_history: output", () => {
       "page_history failed (source_rate_limited): archive requests paused after a refusal. fall back to browsing for this check.",
       "note: archive refused the earliest-capture lookup (HTTP 429)",
     ]);
+  });
+});
+
+describe("page_history: the first capture's copy", () => {
+  // hightouch.com/pricing on 2026-10-26: first_capture was 2022-07-08, and the ChatGPT app can't open
+  // archive links, so the skill couldn't check whose page it was. The capture's own title says.
+  const earliestRaw = `https://web.archive.org/web/${EARLIEST.timestamp}id_/${PAGE}`;
+  const withFirst = (copy: string) => {
+    const s = copies((i) => (i < 13 ? "Alpha" : "Bravo"));
+    return { ...s, pages: { ...s.pages, [EARLIEST.timestamp]: html(copy) } };
+  };
+
+  it("carries the first capture's title and headline, to check who held the address", async () => {
+    const r = await call(JAN, fakeArchive(withFirst("Someone Else")));
+    expect(r.status).toBe("ok");
+    expect(r.first_capture).toMatchObject({ timestamp: EARLIEST.timestamp, title: "Someone Else | Example", headline: "Plans for Someone Else" });
+  });
+
+  it("reads it once, and from the cache after", async () => {
+    const cache = await caches.open(`page-history-${crypto.randomUUID()}`);
+    const first = fakeArchive(withFirst("Someone Else"));
+    await call(JAN, first, { cache });
+    expect(first.calls.filter((u) => u === earliestRaw)).toHaveLength(1);
+    const again = fakeArchive(withFirst("Someone Else"));
+    const r = await call(JAN, again, { cache });
+    expect(again.calls).not.toContain(earliestRaw);
+    expect(r.first_capture?.title).toBe("Someone Else | Example");
+  });
+
+  it("a first capture that can't be read leaves its copy out, and the result ok", async () => {
+    const r = await call(JAN, fakeArchive(copies((i) => (i < 13 ? "Alpha" : "Bravo"))));
+    expect(r.status).toBe("ok");
+    expect(r.first_capture?.timestamp).toBe(EARLIEST.timestamp);
+    expect(r.first_capture).not.toHaveProperty("title");
+    expect(r.first_capture).not.toHaveProperty("headline");
+  });
+
+  it("a search the budget stops spends nothing on the first capture", async () => {
+    const fake = fakeArchive(withFirst("Someone Else"));
+    const r = await call(JAN, fake, { maxFetches: 3 });
+    expect(r.status).toBe("partial");
+    expect(fake.calls).not.toContain(earliestRaw);
+    expect(r.first_capture).not.toHaveProperty("title");
+  });
+
+  it("renders the first capture's title", async () => {
+    const r = await call(JAN, fakeArchive(withFirst("Someone Else")));
+    expect(renderPageHistory(r)).toContain(`first captured 2020-03-01 ("Someone Else | Example"): https://web.archive.org/web/${EARLIEST.timestamp}/${PAGE}`);
+  });
+
+  it("the largest result, with a long first title, stays under the cap", async () => {
+    const s = worstCase();
+    const long = "First ".padEnd(200, "y");
+    const page = `<html><head><title>${long}</title></head><body><h1>${long}</h1></body></html>`;
+    const r = await call({ ...JAN, max_changes: 15 }, fakeArchive({ ...s, pages: { ...s.pages, [EARLIEST.timestamp]: page } }));
+    expect(r.first_capture?.title?.startsWith("First ")).toBe(true);
+    expect(JSON.stringify(r).length).toBeLessThanOrEqual(20_000);
   });
 });
 
