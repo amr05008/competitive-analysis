@@ -1,6 +1,6 @@
 ---
 name: teardown
-description: Use when someone wants a competitive analysis or teardown of one company or product, in any phrasing, such as "analyze this company", "teardown of <company>", "competitive analysis of <company>", "research this competitor", "should we worry about <company>", or diligence on a company. Also when they ask what one landing page or pricing page signals. Produces an evidence-graded teardown where every material claim carries a link, an evidence date, and a VERIFIED / COMPANY-CLAIMED / ESTIMATE label. Four methods are required (positioning history from the Wayback Machine, job-listing mining, contradiction reconciliation, absence as evidence). Not for stock picks, investment advice, financial-statement analysis, or researching a person.
+description: Use when someone wants a competitive analysis or teardown of one company or product, in any phrasing, such as "analyze this company", "teardown of X", "competitive analysis of X", "research this competitor", "should we worry about X", or diligence on a company. Also when they ask what one landing page or pricing page signals. Produces an evidence-graded teardown where every material claim carries a link, an evidence date, and a VERIFIED / COMPANY-CLAIMED / ESTIMATE label. Four methods are required (positioning history from the Wayback Machine, job-listing mining, contradiction reconciliation, absence as evidence). Not for stock picks, investment advice, financial-statement analysis, or researching a person.
 ---
 
 # Teardown
