@@ -15,7 +15,7 @@ It researches companies, not people: no contact lookups and no enrichment of any
 The plugin is one skill plus one connector, its own server at `https://competitive-analysis.aaronmichaelroy.com/mcp`. No sign-in, no keys.
 
 - **What the server receives:** only the page addresses, company names and domains a teardown asks about.
-- **What it reads:** free public sources only. That's the Wayback Machine (web.archive.org), the Greenhouse, Lever and Ashby job-board APIs and the company's own careers page, Hacker News search (hn.algolia.com), and SEC EDGAR.
+- **What it reads:** free public sources only. That's the Wayback Machine (web.archive.org), the Greenhouse, Lever and Ashby job-board APIs and the company's own careers page (and one role page it links to), Hacker News search (hn.algolia.com), and SEC EDGAR.
 - **How archive requests travel:** the Wayback Machine rate-limits the network the server runs on, so its archive requests go through a small relay I run on Vercel. The relay logs nothing.
 - **What it keeps:** cached copies of the public pages it read, so a repeat call is quick, and a daily count of calls by tool and outcome. It keeps no personal data and doesn't log what you ask. A daily self-check on fixed test companies reports failures and a weekly count of calls to me.
 - **On your side:** the skill also has Claude read public web pages with its own web tools.
