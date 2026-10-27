@@ -104,6 +104,7 @@ It is slow (often 6 to 12 seconds), and most of its entries are page rebuilds, n
 
 **Either way:**
 
+- Report each change that alters what the company says it is or sells, such as a new category, product or buyer in the title, headline or subheadings, in date order, each with its two captures. Leave out only rewordings of the same claim, and don't trim the list to fit a table.
 - The evidence date is the date of the capture you cite. With `page_history`, that's the capture's `date`. With a fetch, it's the timestamp of the capture served, from the URL you ended up at or from the lookup, never the date you asked for: Wayback answers with the nearest capture it has. Removed or hidden pricing is a finding. Announcement dates are when the company said something; capture dates are when the site changed. Report both when they differ, and date a pivot by the site.
 - If a company-data tool gave you a headcount trend (see Tools), set it against each change you dated: did the team grow, hold, or shrink across it? Date the change by the site's bracket, or by the announcement where the bracket is wide. Put the answer among the findings, labeled ESTIMATE, with the caveat that the count lags. "Headcount fell by a third in the quarter after the relaunch" is a finding; the count sitting alone in a table is not.
 
@@ -113,7 +114,7 @@ Companies leak traction claims, org strategy, and what they are actually buildin
 
 **With `job_openings`:** call it with `domain` and `company_name`.
 
-- **A board found.** Read `counts` for the function mix. Then call again with `role_ids` (up to five) for the roles that matter, and read their `description`. Report `pay` where the board publishes it, and say so where it doesn't. A board whose newest role was posted or updated more than a year ago may be one the company left behind. Open the careers page once: if it lists more roles, or a role page's apply link names another board, read that board through the endpoints below, and say which board you dropped.
+- **A board found.** Read `counts` for the function mix. Then call again with `role_ids` (up to five) for the roles that matter, and read their `description`. Give the `pay` of each role you cite, or say the board doesn't publish it. A board whose newest role was posted or updated more than a year ago may be one the company left behind. Open the careers page once: if it lists more roles, or a role page's apply link names another board, read that board through the endpoints below, and say which board you dropped.
 - **No board.** `no_public_board_found: true` (shown as "no public board found") is an absence finding (method 4) that names the addresses in `tried`, never a gap. It covers Greenhouse, Lever and Ashby boards, and careers pages that link to them. No board there isn't the same as no hiring: if the company has a careers page, open it once, and read any board it links to on another host, such as Workable, Rippling or SmartRecruiters. If the careers page won't open, say in the coverage gaps that boards on other hosts weren't checked.
 - **Blocked.** A `partial` with no board, because a board or careers page refused or couldn't be checked (shown as "absence is not shown"), is blocked, never absence, after the one re-call its note asks for, if any: name what failed in the coverage gaps. A careers page that links to a board hosted in the EU region means a board exists that the tool didn't read: open the board's address from the note directly.
 
@@ -172,7 +173,7 @@ Open the first reply with the run table:
 | Audience | me, or team (<org>) |
 | Purpose | as stated, or "operator diligence (defaulted)" |
 | Verdict | one of the four below |
-| Run | <date> · <the app you are running in> · <tools used, including this plugin's tools you called> |
+| Run | <date> · <the app you are running in> · <tools used, naming each of this plugin's tools you called> |
 
 Then the evidence key, one line per label.
 
