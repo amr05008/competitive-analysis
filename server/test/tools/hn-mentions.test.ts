@@ -114,6 +114,8 @@ describe("hacker_news_mentions", () => {
     expect(Math.min(...threads.map((t) => t.points))).toBeGreaterThanOrEqual(10);
     expect(threads[0].hn_link).toMatch(/^https:\/\/news\.ycombinator\.com\/item\?id=1\d\d$/);
     expect(threads[0]).toMatchObject({ date: "2024-05-06" });
+    // The fixture's comment count is the story id.
+    expect(threads.every((t) => t.comments === Number(t.hn_link.split("=")[1]))).toBe(true);
     expect(threads.some((t) => t.story_link === null)).toBe(true);
     expect(threads.some((t) => t.story_link?.startsWith("https://example.com/"))).toBe(true);
     expect(fetch.calls.filter((u) => u === threadsUrl("Hightouch"))).toHaveLength(1);
