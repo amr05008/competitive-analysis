@@ -58,32 +58,84 @@ const onDomain = (url: string, domain: string): boolean => {
   }
 };
 
+const HREF = /href\s*=\s*["']([^"'<>\s]{1,300})["']/gi;
+/** A role page's address ends in an id: a UUID (Ashby, Lever) or six or more digits (Greenhouse). */
+const ROLE_ID = /(?:\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[/_-]\d{6,})\/?$/i;
+/** The most role-like links read from one page; a crafted page can hold thousands, each parsed as a URL. */
+const MAX_ROLE_LINKS = 200;
+
+/**
+ * The first link from a careers page to one of its own role pages: https on the company's domain, under
+ * the page's path, and ending in an id. Some companies list their roles on their own site and name the board
+ * only in each role's apply link.
+ */
+function rolePageIn(html: string, pageUrl: string, domain: string): string | null {
+  const base = new URL(pageUrl);
+  const under = `${base.pathname.replace(/\/+$/, "")}/`;
+  let seen = 0;
+  for (const m of html.matchAll(HREF)) {
+    if (!ROLE_ID.test(m[1])) continue;
+    if (++seen > MAX_ROLE_LINKS) break;
+    let u: URL;
+    try {
+      u = new URL(m[1].replace(/&amp;/g, "&"), base);
+    } catch {
+      continue;
+    }
+    if (u.protocol === "https:" && u.port === "" && onDomain(u.href, domain) && u.pathname.startsWith(under) && ROLE_ID.test(u.pathname)) {
+      return u.href;
+    }
+  }
+  return null;
+}
+
+type PageFailure = { url: string; reason: ErrorReason; detail: string; status?: number };
+
+/** The board one page names, by where it ends up or by a link in it; null for a page off the company's domain. */
+async function boardOnPage(
+  fetcher: Fetcher,
+  url: string,
+  domain: string,
+  failures: PageFailure[],
+): Promise<{ found: BoardLink | null; page: { url: string; text: string } | null }> {
+  const r = await politeFetch(fetcher, url, { maxBytes: CAREERS_MAX_BYTES, accept: "text/html" });
+  if (!r.ok) {
+    if (r.reason !== "not_found") failures.push({ url, reason: r.reason, detail: r.detail, status: r.status });
+    return { found: null, page: null };
+  }
+  // A page that ends on a known board page is a link to that board, wherever the company hosts it.
+  const landed = boardAt(r.url);
+  if (landed) return { found: landed, page: null };
+  if (!onDomain(r.url, domain)) return { found: null, page: null };
+  return { found: boardIn(r.text), page: { url: r.url, text: r.text } };
+}
+
 /**
  * Looks for a job-board link on the company's careers pages, in order, and
- * stops at the first one that has it. `tried` lists every page requested. A page
- * that fails for any reason but a 404 is in `failures`, since it is a page we
- * couldn't check. A page that ends up off the company's domain is ignored.
+ * stops at the first one that has it. A careers page that names no board but
+ * links to one of its own role pages has that role page read too, at most one
+ * per call. `tried` lists every page requested. A page that fails for any
+ * reason but a 404 is in `failures`, since it is a page we couldn't check. A
+ * page that ends up off the company's domain is ignored.
  */
 export async function findBoardLink(
   fetcher: Fetcher,
   domain: string,
-): Promise<{ found: BoardLink | null; tried: string[]; failures: { url: string; reason: ErrorReason; detail: string; status?: number }[] }> {
+): Promise<{ found: BoardLink | null; tried: string[]; failures: PageFailure[] }> {
   const tried: string[] = [];
-  const failures: { url: string; reason: ErrorReason; detail: string; status?: number }[] = [];
+  const failures: PageFailure[] = [];
+  let roleRead = false;
   for (const path of PATHS) {
     const url = `https://${domain}${path}`;
     tried.push(url);
-    const r = await politeFetch(fetcher, url, { maxBytes: CAREERS_MAX_BYTES, accept: "text/html" });
-    if (!r.ok) {
-      if (r.reason !== "not_found") failures.push({ url, reason: r.reason, detail: r.detail, status: r.status });
-      continue;
-    }
-    // A path that ends on a known board page is a link to that board, wherever the company hosts it.
-    const landed = boardAt(r.url);
-    if (landed) return { found: landed, tried, failures };
-    if (!onDomain(r.url, domain)) continue;
-    const found = boardIn(r.text);
+    const { found, page } = await boardOnPage(fetcher, url, domain, failures);
     if (found) return { found, tried, failures };
+    const role = page && !roleRead ? rolePageIn(page.text, page.url, domain) : null;
+    if (!role) continue;
+    roleRead = true;
+    tried.push(role);
+    const fromRole = (await boardOnPage(fetcher, role, domain, failures)).found;
+    if (fromRole) return { found: fromRole, tried, failures };
   }
   return { found: null, tried, failures };
 }

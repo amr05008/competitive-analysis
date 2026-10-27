@@ -50,8 +50,11 @@ export const RESPONSE_CAP_CHARS = 20_000;
 /** The most characters in one tool result's text rendering; the structured result carries the rest. */
 export const RENDER_MAX_CHARS = 4_000;
 
-/** The most upstream fetches job_openings makes in one call. */
-export const JOBS_MAX_FETCHES = 20;
+/**
+ * The most upstream fetches job_openings makes in one call: nine board guesses, four careers pages, one role
+ * page, a board and its departments, and five role descriptions.
+ */
+export const JOBS_MAX_FETCHES = 21;
 /** How long job_openings may keep starting fetches, counted from the start of the call. */
 export const JOBS_DEADLINE_MS = 25_000;
 /** How long a job board's role list is cached: one hour. */

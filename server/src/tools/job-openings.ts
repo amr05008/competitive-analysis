@@ -38,6 +38,17 @@ function countBy(roles: RawRole[], field: "department" | "location"): { name: st
   return [...counts].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
+/** A board whose roles are all older than this may be one the company left behind. */
+const STALE_AFTER_MS = 365 * 86_400_000;
+
+/** The newest role date on a board when every dated role is more than a year old; otherwise null. */
+function staleSince(roles: RawRole[], now: number): string | null {
+  const dates = roles.map((r) => r.date).filter((d): d is string => d !== null);
+  if (!dates.length) return null;
+  const newest = dates.reduce((a, b) => (b > a ? b : a));
+  return newest < utcDay(now - STALE_AFTER_MS) ? newest : null;
+}
+
 /** Newest first; roles with no date last, in the board's order. */
 const newestFirst = (roles: RawRole[]): RawRole[] =>
   roles
@@ -155,7 +166,14 @@ export async function jobOpenings(
     }
   }
 
-  if (!board && !stopped) {
+  // A board found under a guessed name with no role in the last year may be one the company left behind, so
+  // the careers pages are read for the board they name now.
+  const guessed = board as Found | null;
+  const staleNewest = guessed ? staleSince(guessed.roles, deps.now()) : null;
+  const careersFailuresBefore = failures.length;
+  /** Set when the careers pages link to the guessed board itself, so the company does use it. */
+  let linksGuessed = false;
+  if ((!guessed || staleNewest) && !stopped) {
     if (budget.exhausted) stopped = true;
     else {
       const refusals = refusedUrls.size;
@@ -175,6 +193,8 @@ export async function jobOpenings(
         euNote = `the careers page links to a ${label} board hosted in the EU region, ${euBoardUrl(link.found)}, which wasn't checked`;
       } else if (link.found && !attempted.has(`${link.found.ats}:${link.found.slug}`)) {
         if (!(await tryBoard(link.found.ats, link.found.slug))) stopped = true;
+      } else if (link.found && guessed && link.found.ats === guessed.ats && link.found.slug === guessed.slug) {
+        linksGuessed = true;
       }
     }
   }
@@ -200,6 +220,26 @@ export async function jobOpenings(
     };
   }
 
+  if (guessed && staleNewest) {
+    if (found !== guessed) {
+      notes.push(`the ${guessed.ats} board "${guessed.slug}", found by guessing the name, has no role posted or updated since ${staleNewest}, so the board the company's careers pages name was used instead`);
+    } else if (linksGuessed) {
+      notes.push(`every role on this board was posted or updated more than a year ago (the newest on ${staleNewest}), though the company's careers pages link to it`);
+    } else {
+      const checked = !stopped && !euNote && failures.length === careersFailuresBefore;
+      notes.push(
+        `every role on this board was posted or updated more than a year ago (the newest on ${staleNewest}), so it may be one the company no longer uses${checked ? "; the careers pages name no other board" : ""}`,
+      );
+    }
+    if (stopped) {
+      noteStop();
+      partial = true;
+    }
+    if (euNote) {
+      notes.push(euNote);
+      partial = true;
+    }
+  }
   if (failures.length) notes.push(...failures.map((f) => `${f}; the board found above was used`));
 
   // The roles asked for by id, with descriptions; otherwise the newest.

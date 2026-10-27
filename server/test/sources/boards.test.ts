@@ -359,4 +359,74 @@ describe("findBoardLink", () => {
     expect(r.failures[0]).toMatchObject({ url: PAGES[0], reason: "source_unavailable", status: 403 });
     expect(r.failures[0].detail).toContain("403");
   });
+
+  describe("role pages", () => {
+    const id = "24dba985-1d50-4853-a33d-47ef56552735";
+    const role = `https://acme.io/careers/${id}`;
+    // Hightouch's careers page lists its roles on its own site and names no board; each role page's apply link does.
+    const listing = `<h1>88 open positions</h1><a class="group" href="/careers/${id}">Account Executive</a>`;
+    const apply = `<script>{"applyLink":"https://jobs.ashbyhq.com/acme-inc/${id}"}</script>`;
+
+    it("reads one role page a careers page links to, when the page names no board", async () => {
+      const f = fakeFetch({ [PAGES[0]]: listing, [role]: apply });
+      expect(await findBoardLink(f, "acme.io")).toEqual({ found: { ats: "ashby", slug: "acme-inc" }, tried: [PAGES[0], role], failures: [] });
+      expect(f.calls).toEqual([PAGES[0], role]);
+    });
+
+    it.each([
+      ["a numeric id", "/careers/4567890", "https://acme.io/careers/4567890"],
+      ["an id after the title", "/careers/senior-engineer-4567890", "https://acme.io/careers/senior-engineer-4567890"],
+      ["an absolute link on a subdomain", `https://www.acme.io/careers/${id}`, `https://www.acme.io/careers/${id}`],
+    ])("takes %s as a role page", async (_kind, href, url) => {
+      const f = fakeFetch({ [PAGES[0]]: `<a href="${href}">Engineer</a>`, [url]: '<a href="https://jobs.lever.co/acme-co/x">Apply</a>' });
+      expect((await findBoardLink(f, "acme.io")).found).toEqual({ ats: "lever", slug: "acme-co" });
+    });
+
+    it("follows only a role page on the company's site, under the careers page", async () => {
+      const html = [
+        '<a href="/blog/launch-1234567">Blog</a>',
+        `<a href="https://other.example/careers/${id}">Elsewhere</a>`,
+        `<a href="https://acme.io.evil.example/careers/${id}">Look-alike</a>`,
+        '<a href="/careers/benefits">Benefits</a>',
+        `<a href="javascript:void(0)/careers/${id}">Script</a>`,
+        `<a href="http://acme.io/careers/${id}">Plain HTTP</a>`,
+        `<a href="https://acme.io:8443/careers/${id}">Other port</a>`,
+      ].join("");
+      const f = fakeFetch({ [PAGES[0]]: html });
+      expect(await findBoardLink(f, "acme.io")).toEqual({ found: null, tried: PAGES, failures: [] });
+    });
+
+    it("reads one role page at most", async () => {
+      const f = fakeFetch({ [PAGES[0]]: '<a href="/careers/1111111">A</a>', [PAGES[1]]: '<a href="/jobs/2222222">B</a>' });
+      const r = await findBoardLink(f, "acme.io");
+      expect(r.found).toBeNull();
+      expect(f.calls).toEqual([PAGES[0], "https://acme.io/careers/1111111", ...PAGES.slice(1)]);
+      expect(r.tried).toEqual(f.calls);
+    });
+
+    it("reports a refused role page as a failure, not absence", async () => {
+      const r = await findBoardLink(fakeFetch({ [PAGES[0]]: listing, [role]: { status: 403 } }), "acme.io");
+      expect(r.found).toBeNull();
+      expect(r.failures).toEqual([expect.objectContaining({ url: role, status: 403 })]);
+    });
+
+    it("ignores a role page that redirects off the company's domain", async () => {
+      const f = fakeFetch({
+        [PAGES[0]]: listing,
+        [role]: { status: 302, headers: { location: "https://other.example/job" } },
+        "https://other.example/job": apply,
+      });
+      expect((await findBoardLink(f, "acme.io")).found).toBeNull();
+    });
+
+    it("reads a crafted 512 KB page of role-like links in under 100 ms", async () => {
+      const junk = `<a href="https://other.example/careers/${id}">x</a>`;
+      const page = junk.repeat(Math.floor(CAREERS_MAX_BYTES / junk.length));
+      expect(page.length).toBeGreaterThan(500_000);
+      const start = performance.now();
+      const r = await findBoardLink(fakeFetch({ [PAGES[0]]: page }), "acme.io");
+      expect(performance.now() - start).toBeLessThan(100);
+      expect(r.found).toBeNull();
+    });
+  });
 });

@@ -8,6 +8,7 @@ import { jobOpenings, renderJobOpenings } from "../../src/tools/job-openings";
 import { Subrequests } from "../../src/shared/subrequests";
 import { fakeFetch, hangingOn, type FakeFetch, type Route } from "../helpers/fake-fetch";
 import { meter } from "../helpers/meter";
+import ashbyHightouch from "../fixtures/boards/ashby-hightouch.json";
 import careersAshby from "../fixtures/boards/careers-ashby-link.html?raw";
 import ghDepartments from "../fixtures/boards/greenhouse-stripe-departments.json";
 import ghDetail from "../fixtures/boards/greenhouse-stripe-job-detail.json";
@@ -267,6 +268,99 @@ describe("job_openings: tried", () => {
   });
 });
 
+describe("job_openings: a board left behind", () => {
+  // Hightouch on 2026-10-26: the guessed name finds an Ashby board whose one role was posted 2021-03-16. The
+  // careers page lists 88 roles on hightouch.com and names no board; each role page's apply link names hightouch-inc.
+  const input = { domain: "hightouch.com", company_name: "Hightouch" };
+  const id = "24dba985-1d50-4853-a33d-47ef56552735";
+  const rolePage = `https://hightouch.com/careers/${id}`;
+  const left = () => ({ [ashbyApi("hightouch")]: JSON.stringify(ashbyHightouch) });
+
+  it("a guessed board with no role in the last year gives way to the board a role page names", async () => {
+    const { result, fetch } = await call(input, {
+      ...left(),
+      [careers("hightouch.com")[0]]: `<a class="group" href="/careers/${id}">Account Executive</a>`,
+      [rolePage]: `<script>{"applyLink":"https://jobs.ashbyhq.com/hightouch-inc/${id}"}</script>`,
+      [ashbyApi("hightouch-inc")]: JSON.stringify(ashbyBoard(3)),
+    });
+    expect(result.status).toBe("ok");
+    expect(result.board).toEqual({ ats: "ashby", slug: "hightouch-inc", url: "https://jobs.ashbyhq.com/hightouch-inc" });
+    expect(result.counts?.total).toBe(3);
+    expect(fetch.calls).toEqual([gh("hightouch"), ashbyApi("hightouch"), careers("hightouch.com")[0], rolePage, ashbyApi("hightouch-inc")]);
+    expect(result.tried).toEqual(fetch.calls);
+    const note = result.notes.find((n) => n.includes('"hightouch"'));
+    expect(note).toContain("2021-03-16");
+    expect(note).toContain("used instead");
+  });
+
+  it("keeps the old board, with a note, when the careers pages name no other", async () => {
+    const { result, fetch } = await call(input, left());
+    expect(result.status).toBe("ok");
+    expect(result.board?.slug).toBe("hightouch");
+    expect(fetch.calls).toEqual([gh("hightouch"), ashbyApi("hightouch"), ...careers("hightouch.com")]);
+    const note = result.notes.find((n) => n.includes("more than a year ago"));
+    expect(note).toContain("the newest on 2021-03-16");
+    expect(note).toContain("name no other board");
+  });
+
+  it("a careers page that links the old board itself says so, and keeps it", async () => {
+    const { result } = await call(input, { ...left(), [careers("hightouch.com")[0]]: '<a href="https://jobs.ashbyhq.com/hightouch">Jobs</a>' });
+    expect(result.status).toBe("ok");
+    expect(result.board?.slug).toBe("hightouch");
+    const note = result.notes.find((n) => n.includes("more than a year ago"));
+    expect(note).toContain("careers pages link to it");
+    expect(note).not.toContain("no longer uses");
+  });
+
+  it("a careers page that links an EU board keeps the old board, partial, with the EU note", async () => {
+    const { result } = await call(input, { ...left(), [careers("hightouch.com")[0]]: '<a href="https://job-boards.eu.greenhouse.io/hightouch">Jobs</a>' });
+    expect(result.status).toBe("partial");
+    expect(result.board?.slug).toBe("hightouch");
+    expect(result.notes.join(" ")).toContain("EU region");
+    expect(result.notes.join(" ")).not.toContain("name no other board");
+  });
+
+  it("a careers page that fails is noted, and the old board is kept", async () => {
+    const { result } = await call(input, { ...left(), [careers("hightouch.com")[0]]: { status: 403 } });
+    expect(result.board?.slug).toBe("hightouch");
+    expect(result.notes.join(" ")).toMatch(/careers page .* 403.*the board found above was used/);
+    expect(result.notes.join(" ")).toContain("more than a year ago");
+    expect(result.notes.join(" ")).not.toContain("name no other board");
+  });
+
+  it("a careers check the budget cuts short is partial, with the stop note", async () => {
+    const { result } = await call(input, left(), { maxFetches: 2 });
+    expect(result.status).toBe("partial");
+    expect(result.board?.slug).toBe("hightouch");
+    expect(result.notes.join(" ")).toContain("fetch budget of 2");
+    expect(result.notes.join(" ")).not.toContain("name no other board");
+  });
+
+  it("a guessed board with a role in the last year doesn't read the careers pages", async () => {
+    const recent = { jobs: [{ ...ashbyHightouch.jobs[0], publishedAt: "2025-10-21T09:00:00.000+00:00" }] };
+    const { result, fetch } = await call(input, { [ashbyApi("hightouch")]: JSON.stringify(recent) });
+    expect(result.board?.slug).toBe("hightouch");
+    expect(fetch.calls).toEqual([gh("hightouch"), ashbyApi("hightouch")]);
+    expect(result.notes.join(" ")).not.toContain("year");
+  });
+
+  it("finds the board through a role page when no guessed name answers", async () => {
+    const role = "https://acme.io/careers/4567890";
+    const { result, fetch } = await call(
+      { domain: "acme.io" },
+      {
+        [careers("acme.io")[0]]: '<a href="/careers/4567890">Engineer</a>',
+        [role]: '<a href="https://boards.greenhouse.io/acme-co/jobs/4567890">Apply</a>',
+        [gh("acme-co")]: JSON.stringify(ghJobs),
+        [ghDeps("acme-co")]: JSON.stringify(ghDepartments),
+      },
+    );
+    expect(result.board).toMatchObject({ ats: "greenhouse", slug: "acme-co" });
+    expect(fetch.calls).toEqual([gh("acme"), ashbyApi("acme"), leverApi("acme"), careers("acme.io")[0], role, gh("acme-co"), ghDeps("acme-co")]);
+    expect(result.notes.join(" ")).not.toContain("year");
+  });
+});
+
 describe("job_openings: budget", () => {
   it("returns what is done as partial when the fetch budget runs out", async () => {
     const { result, fetch } = await call({ domain: "acme.io", company_name: "Acme Labs, Inc." }, {}, { maxFetches: 2 });
@@ -449,10 +543,11 @@ describe("job_openings: subrequests on a cold cache", () => {
     return { m, deps: callDeps({ fetch: m.fetch, cache: m.cache, archive: noArchive, now: () => NOW }, limit, "test") };
   }
 
-  /** Nine absent boards, three empty careers pages, a fourth linking a Greenhouse board, and five role details. */
+  /** Nine absent boards, three empty careers pages, a fourth linking a role page that names a Greenhouse board, and five role details. */
   function worstPath(): Record<string, Route> {
     const routes: Record<string, Route> = {
-      [careers("acme.io")[3]]: '<a href="https://boards.greenhouse.io/acmehq">Jobs</a>',
+      [careers("acme.io")[3]]: '<a href="/about/careers/7654321">Engineer</a>',
+      "https://acme.io/about/careers/7654321": '<a href="https://boards.greenhouse.io/acmehq">Apply</a>',
       [gh("acmehq")]: JSON.stringify(ghJobs),
       [ghDeps("acmehq")]: JSON.stringify(ghDepartments),
     };
@@ -470,13 +565,13 @@ describe("job_openings: subrequests on a cold cache", () => {
     expect(m.total()).toBe(9);
   });
 
-  it("the longest path, every board tried and found through the careers page, takes 40", async () => {
+  it("the longest path, every board tried and found through a role page, takes 41", async () => {
     const { m, deps } = await metered(worstPath());
     const result = await jobOpenings({ domain: "acme.io", company_name: "Acme Labs", role_ids: ids }, deps);
     expect(result.status).toBe("ok");
     expect(result.board?.slug).toBe("acmehq");
     expect(result.roles?.every((r) => r.description)).toBe(true);
-    expect(m.counts).toEqual({ fetch: 20, cache: 20 });
+    expect(m.counts).toEqual({ fetch: 21, cache: 20 });
   });
 
   it("at a lower limit it stops before the limit with partial, and says to call again", async () => {
