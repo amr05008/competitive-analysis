@@ -3,8 +3,8 @@ import { z } from "zod";
 import { MAX_ROLES, RESPONSE_CAP_CHARS, ROLE_DESCRIPTION_MAX_CHARS } from "../../src/config";
 import { FALLBACK_LINE } from "../../src/contract/envelope";
 import { jobOpeningsOutput, type JobOpeningsInput, type JobOpeningsResult } from "../../src/contract/tools";
-import { callDeps, render, type ToolDeps } from "../../src/tools";
-import { jobOpenings, renderJobOpenings } from "../../src/tools/job-openings";
+import { callDeps, type ToolDeps } from "../../src/tools";
+import { jobOpenings } from "../../src/tools/job-openings";
 import { Subrequests } from "../../src/shared/subrequests";
 import { fakeFetch, hangingOn, type FakeFetch, type Route } from "../helpers/fake-fetch";
 import { meter } from "../helpers/meter";
@@ -136,7 +136,6 @@ describe("job_openings: finding the board", () => {
     expect(note).toContain(url);
     expect(note).toContain("wasn't checked");
     expect(fetch.calls.some((u) => u.includes("acmeeu"))).toBe(false);
-    expect(renderJobOpenings(result)).not.toContain("no public board found");
   });
 
   it("a careers page that redirects to an EU Lever board is partial and unchecked too", async () => {
@@ -568,35 +567,6 @@ describe("job_openings: size", () => {
     expect(result.roles!.every((r) => (r.description ?? "").length > 0)).toBe(true);
     expect(JSON.stringify(result).length).toBeLessThanOrEqual(RESPONSE_CAP_CHARS);
     expect(result.counts?.total).toBe(300);
-  });
-});
-
-describe("job_openings: rendering", () => {
-  it("puts notes right after the header, then counts and roles", async () => {
-    const { result } = await call({ domain: "acme.io" }, { [ashbyApi("acme")]: JSON.stringify(ashbyBoard(60)) });
-    const lines = renderJobOpenings(result).split("\n");
-    expect(lines[0]).toBe("Job openings: ashby board acme, https://jobs.ashbyhq.com/acme (ok)");
-    expect(lines[1]).toMatch(/^note: showing 40 of 60/);
-    expect(lines.join("\n")).toContain("60 open roles");
-    expect(lines.join("\n")).toContain("Dept 0 (20)");
-    expect(lines.some((l) => l.startsWith("- Engineer 59"))).toBe(true);
-  });
-
-  it("says plainly when no public board was found, and when a check failed", async () => {
-    const none = await call({ domain: "acme.io" }, {});
-    expect(renderJobOpenings(none.result)).toContain("no public board found");
-    const refused = await call({ domain: "acme.io" }, { [ashbyApi("acme")]: { status: 403 } });
-    const text = renderJobOpenings(refused.result);
-    expect(text).toContain("could not be checked");
-    expect(text).not.toContain("no public board found");
-  });
-
-  it("renders an error with its fallback line, and stays within the cap", async () => {
-    const bad = await call({ domain: "127.0.0.1" }, {});
-    expect(render("job_openings", bad.result)).toContain(FALLBACK_LINE);
-    const ids = [0, 1, 2, 3, 4].map((i) => `role-${i}`);
-    const big = await call({ domain: "acme.io", role_ids: ids }, { [ashbyApi("acme")]: JSON.stringify(ashbyBoard(5, { description: "y".repeat(3000) })) });
-    expect(render("job_openings", big.result).length).toBeLessThanOrEqual(4000);
   });
 });
 

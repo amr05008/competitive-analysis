@@ -280,35 +280,3 @@ export async function secFilings(
   for (let n = entities.length - 1; !fits(result) && n >= 0; n--) result = assemble(0, 0, n);
   return result;
 }
-
-// --------------------------------------------------------------- rendering
-
-const money = (v: string | null): string => (v === null ? "n/a" : /^\d+$/.test(v) ? `$${Number(v).toLocaleString("en-US")}` : v);
-
-/** The short text that goes with a sec_filings result: a header, the notes, then each company. */
-export function renderSec(r: SecResult): string {
-  if (r.status === "error") {
-    const e = r.error;
-    return e
-      ? `sec_filings failed (${e.reason}): ${e.detail}. ${e.fallback}`
-      : "sec_filings failed. fall back to browsing for this check.";
-  }
-  const lines = [`SEC filings for "${(r.names_tried ?? []).join('", "')}" (${r.status})`, ...r.notes.map((n) => `note: ${n}`)];
-  if (r.statement) lines.push(r.statement);
-  for (const e of r.entities ?? []) {
-    lines.push(`${e.name} (CIK ${e.cik}${e.state ? `, ${e.state}` : ""}${e.exact_match ? "" : ", close match"}) ${e.edgar_link}`);
-    if (e.former_names.length) lines.push(`  formerly ${e.former_names.join("; ")}`);
-    for (const d of e.form_d) {
-      const parts = [
-        `offering ${money(d.total_offering_amount)}`,
-        `sold ${money(d.total_amount_sold)}`,
-        `first sale ${d.date_of_first_sale ?? "n/a"}`,
-        ...(d.industry_group ? [d.industry_group] : []),
-        ...(d.year_of_incorporation ? [`incorporated ${d.year_of_incorporation}`] : []),
-      ];
-      lines.push(`  Form D${d.amendment ? "/A" : ""} filed ${d.date_filed}: ${parts.join(", ")} ${d.link}`);
-    }
-    if (e.filings.length) lines.push(`  Recent filings: ${e.filings.slice(0, 8).map((f) => `${f.form} ${f.date}`).join("; ")}`);
-  }
-  return lines.join("\n");
-}

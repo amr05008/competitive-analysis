@@ -167,26 +167,3 @@ export async function hackerNewsMentions(
   for (let n = MAX_THREADS - 1; !fits(result) && n >= 0; n--) result = assemble(0, n);
   return result;
 }
-
-// --------------------------------------------------------------- rendering
-
-/** The short text that goes with a hacker_news_mentions result: a header, the notes, a line per year, then the top threads. */
-export function renderHn(r: HnResult): string {
-  if (r.status === "error") {
-    const e = r.error;
-    return e
-      ? `hacker_news_mentions failed (${e.reason}): ${e.detail}. ${e.fallback}`
-      : "hacker_news_mentions failed. fall back to browsing for this check.";
-  }
-  const lines = [`Hacker News mentions of "${r.query ?? ""}" (${r.status})`, ...r.notes.map((n) => `note: ${n}`)];
-  for (const y of r.years ?? []) {
-    const linking = y.stories_linking_domain === undefined ? "" : `, ${y.stories_linking_domain} linking the site`;
-    const titles = y.sample_titles.length ? `; e.g. ${y.sample_titles.map((t) => `"${t}"`).join("; ")}` : "";
-    lines.push(`${y.year}: ${y.stories} stories, ${y.comments} comments${linking}${titles} ${y.search_link}`);
-  }
-  if (r.top_threads?.length) {
-    lines.push("Top threads:");
-    for (const t of r.top_threads) lines.push(`- ${t.title} (${t.points} points, ${t.comments} comments, ${t.date}) ${t.hn_link}`);
-  }
-  return lines.join("\n");
-}

@@ -9,7 +9,7 @@ import type { FetchOutcome } from "./shared/http";
 import { limitsStub } from "./shared/limits";
 import { parseSubrequestLimit } from "./shared/subrequests";
 import { outcomeOf } from "./shared/usage-store";
-import { callDeps, IMPLEMENTATIONS, render, type ToolDeps } from "./tools";
+import { callDeps, IMPLEMENTATIONS, type ToolDeps } from "./tools";
 
 /** One tool call's deps, with its own subrequest counter (see callDeps). */
 export function makeDeps(env: Env): ToolDeps {
@@ -92,7 +92,8 @@ export function buildServer(env: Env, ctx: ExecutionContext): McpServer {
         const result = await runTool(tool.name, input, env, ctx, { selfCheck: false });
         return {
           structuredContent: result,
-          content: [{ type: "text", text: render(tool.name, result) }],
+          // Some hosts (claude.ai) give the model only the text, so it is the whole result.
+          content: [{ type: "text", text: JSON.stringify(result) }],
           isError: result.status === "error",
         };
       },

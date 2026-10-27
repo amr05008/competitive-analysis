@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { RESPONSE_CAP_CHARS } from "../../src/config";
 import { hnOutput, type HnInput, type HnResult } from "../../src/contract/tools";
-import { callDeps, render, type ToolDeps } from "../../src/tools";
-import { hackerNewsMentions, renderHn } from "../../src/tools/hn-mentions";
+import { callDeps, type ToolDeps } from "../../src/tools";
+import { hackerNewsMentions } from "../../src/tools/hn-mentions";
 import { Subrequests } from "../../src/shared/subrequests";
 import { fakeFetch, hangingOn, type FakeFetch, type Route } from "../helpers/fake-fetch";
 import { meter } from "../helpers/meter";
@@ -213,19 +213,6 @@ describe("hacker_news_mentions", () => {
     expect(result.top_threads).toHaveLength(5);
   });
 
-  it("renders the notes right after the header, then years and threads", async () => {
-    const { result } = await call({ query: "Hightouch", years: 1 }, {
-      ...yearRoutes("Hightouch", [2026]),
-      [threadsUrl("Hightouch")]: body(1, [hit(7, 9, "A thread", "https://example.com/a")]),
-    });
-    const lines = render("hacker_news_mentions", result).split("\n");
-    expect(lines[0]).toBe('Hacker News mentions of "Hightouch" (ok)');
-    expect(lines[1]).toBe("note: 2026 is counted to date");
-    expect(lines[2]).toContain("2026: 26 stories, 1026 comments");
-    expect(lines[2]).toContain("https://hn.algolia.com/?dateRange=custom");
-    expect(lines).toContain("- A thread (9 points, 7 comments, 2024-05-06) https://news.ycombinator.com/item?id=7");
-  });
-
   it("keeps a year's counts when only its domain search fails, and says the domain count is missing", async () => {
     const routes = { ...yearRoutes("Hightouch", [2025, 2026], "hightouch.com"), [threadsUrl("Hightouch")]: body(0) };
     routes[linkingUrl("hightouch.com", 2026)] = { status: 503 };
@@ -237,16 +224,6 @@ describe("hacker_news_mentions", () => {
     ]);
     expect(result.years?.[1]).not.toHaveProperty("stories_linking_domain");
     expect(result.notes.join(" ")).toContain("so stories_linking_domain is missing for 2026");
-  });
-
-  it("renders an error with the fallback line", () => {
-    const text = renderHn({
-      status: "error",
-      notes: [],
-      retrieved_at: "2026-10-20",
-      error: { reason: "bad_input", detail: "nope", tried: [], fallback: "fall back to browsing for this check." },
-    });
-    expect(text).toBe("hacker_news_mentions failed (bad_input): nope. fall back to browsing for this check.");
   });
 });
 

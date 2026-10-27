@@ -82,6 +82,18 @@ describe("tools/list", () => {
   });
 });
 
+// Some hosts (claude.ai) give the model only a result's text, never its structured content,
+// so the text is the structured result as JSON: the same data on every host.
+describe("tools/call", () => {
+  it("a result's text is its structured content as JSON", async () => {
+    const result = await rpc("tools/call", { name: "job_openings", arguments: { domain: "127.0.0.1" } });
+    expect(result.structuredContent.status).toBe("error");
+    expect(result.content).toHaveLength(1);
+    expect(result.content[0].type).toBe("text");
+    expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+  });
+});
+
 describe("assertAdditive", () => {
   const before = (): ToolListJson => ({
     tools: [

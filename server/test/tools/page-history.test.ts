@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { errorResult } from "../../src/contract/envelope";
 import { pageHistoryOutput, type PageHistoryInput, type PageHistoryResult } from "../../src/contract/tools";
 import type { ArchiveFetch } from "../../src/shared/http";
 import type { CaptureRow } from "../../src/sources/wayback";
-import { callDeps, MORE_LINE, render, type ToolDeps } from "../../src/tools";
-import { pageHistory, renderPageHistory } from "../../src/tools/page-history";
+import { callDeps, type ToolDeps } from "../../src/tools";
+import { pageHistory } from "../../src/tools/page-history";
 import { Subrequests } from "../../src/shared/subrequests";
 import { fakeArchive, type FakeArchive } from "../helpers/fake-archive";
 import { fakeFetch } from "../helpers/fake-fetch";
@@ -261,7 +260,6 @@ describe("page_history: dating changes", () => {
     const r = await call(JAN, fake);
     expect(pairs(r)).toEqual([[ts(12), ts(13)]]);
     expect(r.notes.some((n) => n.includes("meta description") && n.includes(dateOf(13)))).toBe(true);
-    expect(renderPageHistory(r)).toContain("meta description");
   });
 });
 
@@ -662,50 +660,6 @@ describe("page_history: output", () => {
     expect(JSON.stringify(r).length).toBeLessThanOrEqual(20_000);
     expect(r.notes.some((n) => n.includes("more changes not shown, the ones that changed the least copy"))).toBe(true);
   });
-
-  it("renders one line per change", async () => {
-    const r = await call(JAN, fakeArchive(copies((i) => (i <= 8 ? "Alpha" : i <= 10 ? "Bravo" : "Charlie"))));
-    const text = renderPageHistory(r);
-    expect(text).toContain("first captured 20");
-    const lines = text.split("\n").filter((l) => l.includes("between 2025-"));
-    expect(lines).toHaveLength(2);
-    expect(lines[0]).toContain(`between ${dateOf(8)} and ${dateOf(9)}`);
-    expect(lines[0]).toContain("Plans for Bravo");
-  });
-
-  it("the worst-case render stops at 4000 characters, at a line break, with a pointer to the structured result", async () => {
-    const r = await call({ ...JAN, max_changes: 15 }, fakeArchive(worstCase()));
-    const full = renderPageHistory(r);
-    expect(full.length).toBeGreaterThan(4000);
-    const text = render("page_history", r);
-    expect(text.length).toBeLessThanOrEqual(4000);
-    expect(text.endsWith(`\n${MORE_LINE}`)).toBe(true);
-    const kept = text.slice(0, -MORE_LINE.length - 1);
-    expect(full.startsWith(`${kept}\n`)).toBe(true);
-    // The notes come before the change lines, so the cap keeps them.
-    for (const n of r.notes) expect(text).toContain(`note: ${n}`);
-    expect(text.indexOf("note: ")).toBeLessThan(text.indexOf("- between "));
-  });
-
-  it("a short render is unchanged", async () => {
-    const r = await call(JAN, fakeArchive(copies((i) => (i <= 8 ? "Alpha" : i <= 10 ? "Bravo" : "Charlie"))));
-    expect(render("page_history", r)).toBe(renderPageHistory(r));
-  });
-
-  it("renders an error with the fallback line", () => {
-    const text = renderPageHistory(errorResult("bad_input", "IP addresses are not accepted", [], NOW));
-    expect(text).toContain("bad_input");
-    expect(text).toContain("fall back to browsing for this check.");
-  });
-
-  it("renders an error's notes after its first line", () => {
-    const failed = errorResult("source_rate_limited", "archive requests paused after a refusal", [], NOW);
-    const text = renderPageHistory({ ...failed, notes: ["archive refused the earliest-capture lookup (HTTP 429)"] });
-    expect(text.split("\n")).toEqual([
-      "page_history failed (source_rate_limited): archive requests paused after a refusal. fall back to browsing for this check.",
-      "note: archive refused the earliest-capture lookup (HTTP 429)",
-    ]);
-  });
 });
 
 describe("page_history: the first capture's copy", () => {
@@ -766,11 +720,6 @@ describe("page_history: the first capture's copy", () => {
     expect(r.status).toBe("partial");
     expect(fake.calls).not.toContain(earliestRaw);
     expect(r.first_capture).not.toHaveProperty("title");
-  });
-
-  it("renders the first capture's title", async () => {
-    const r = await call(JAN, fakeArchive(withFirst("Someone Else")));
-    expect(renderPageHistory(r)).toContain(`first captured 2020-03-01 ("Someone Else | Example"): https://web.archive.org/web/${EARLIEST.timestamp}/${PAGE}`);
   });
 
   it("the largest result, with a long first title, stays under the cap", async () => {

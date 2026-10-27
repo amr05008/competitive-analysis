@@ -47,8 +47,6 @@ export const DEFAULT_SUBREQUEST_LIMIT = 45;
 export const TOOL_HARD_DEADLINE_MS = 28_000;
 /** The most characters of JSON in one tool result. */
 export const RESPONSE_CAP_CHARS = 20_000;
-/** The most characters in one tool result's text rendering; the structured result carries the rest. */
-export const RENDER_MAX_CHARS = 4_000;
 
 /**
  * The most upstream fetches job_openings makes in one call: nine board guesses, four careers pages, one role

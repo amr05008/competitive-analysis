@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { RESPONSE_CAP_CHARS } from "../../src/config";
 import { secOutput, type SecInput, type SecResult } from "../../src/contract/tools";
-import { callDeps, render, type ToolDeps } from "../../src/tools";
-import { renderSec, secFilings } from "../../src/tools/sec-filings";
+import { callDeps, type ToolDeps } from "../../src/tools";
+import { secFilings } from "../../src/tools/sec-filings";
 import { Subrequests } from "../../src/shared/subrequests";
 import { fakeFetch, hangingOn, type FakeFetch, type Route } from "../helpers/fake-fetch";
 import { meter } from "../helpers/meter";
@@ -109,7 +109,7 @@ describe("sec_filings", () => {
 
   it("never returns related persons, signers or sales-compensation names", async () => {
     const { result } = await call({ company_name: "Stripe" }, stripeRoutes());
-    const text = JSON.stringify(result) + render("sec_filings", result);
+    const text = JSON.stringify(result);
     expect(text).not.toMatch(/Person|Berry|Oyster|298-5539/);
     expect(result.entities?.[0]).not.toHaveProperty("ein");
   });
@@ -189,7 +189,6 @@ describe("sec_filings", () => {
     expect(result.entities?.map((e) => e.exact_match)).toEqual([false, false]);
     expect(result.notes).toContain("no exact name match; these are close matches");
     expect(result.statement).toBe("none of the companies listed is filed under exactly these names: Acme; they are close matches, not the company itself");
-    expect(renderSec(result)).toContain(result.statement!);
   });
 
   it("the close-match statement names every name tried", async () => {
@@ -463,25 +462,6 @@ describe("sec_filings", () => {
     const { result } = await call({ company_name: "Long" }, routes);
     expect(result.entities).toHaveLength(5);
     expect(result.notes).toContain("lists are shortened to fit the response size");
-  });
-});
-
-describe("renderSec", () => {
-  it("renders a header, notes right after it, then each company", async () => {
-    const { result } = await call({ company_name: "Stripe" }, { ...stripeRoutes() }, { maxFetches: 4 });
-    const text = renderSec(result);
-    const lines = text.split("\n");
-    expect(lines[0]).toBe('SEC filings for "Stripe" (partial)');
-    expect(lines[1]).toMatch(/^note: /);
-    expect(text).toContain("Stripe, Inc.");
-    expect(render("sec_filings", result)).toBe(text);
-  });
-
-  it("renders the statement and errors", async () => {
-    const { result } = await call({ company_name: "Hightouch" }, { [`${SEARCH}Hightouch`]: JSON.stringify(searchEmpty) });
-    expect(renderSec(result)).toContain("no filings found under these names: Hightouch");
-    const bad = await call({ company_name: "Example", domain: "127.0.0.1" }, {});
-    expect(renderSec(bad.result)).toMatch(/^sec_filings failed \(bad_input\)/);
   });
 });
 
