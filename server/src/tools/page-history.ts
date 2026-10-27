@@ -383,6 +383,10 @@ export async function pageHistory(
         : Promise.resolve({ ok: false, reason: "server_busy", status: REFUSED_STATUS, url: u, detail: "out of fetches or time" });
     const r = await fingerprintAt(gated, deps.cache, firstCapture.timestamp, page.url);
     if (r.ok && r.fp.readable) firstCopy = r.fp;
+    // A refusal pauses every archive request on the server for a while, so the next call would fail too.
+    else if (!r.ok && r.reason === "source_rate_limited") {
+      notes.push(`archive refused the first capture's copy (${failureText(r)}), so its title is missing; wait a few minutes before calling again`);
+    }
   }
   const fpAt = (i: number) => (search.reads[i] as { fp: Fingerprint }).fp;
 

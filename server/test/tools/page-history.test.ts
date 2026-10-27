@@ -742,6 +742,24 @@ describe("page_history: the first capture's copy", () => {
     expect(r.first_capture).not.toHaveProperty("headline");
   });
 
+  it("a refused first-capture read says to wait, since the archive gate now pauses, and stays ok", async () => {
+    const fake = fakeArchive({ ...withFirst("Someone Else"), failures: { [EARLIEST.timestamp]: { status: 429 } } });
+    const r = await call(JAN, fake);
+    expect(r.status).toBe("ok");
+    expect(r.changes).toHaveLength(1);
+    expect(r.first_capture).not.toHaveProperty("title");
+    const note = r.notes.find((n) => n.includes("first capture's copy"));
+    expect(note).toContain("source_rate_limited");
+    expect(note).toContain("wait a few minutes before calling again");
+  });
+
+  it("a first capture that fails for another reason just leaves its copy out", async () => {
+    const r = await call(JAN, fakeArchive({ ...withFirst("Someone Else"), failures: { [EARLIEST.timestamp]: { status: 500 } } }));
+    expect(r.status).toBe("ok");
+    expect(r.first_capture).not.toHaveProperty("title");
+    expect(r.notes).toEqual([]);
+  });
+
   it("a search the budget stops spends nothing on the first capture", async () => {
     const fake = fakeArchive(withFirst("Someone Else"));
     const r = await call(JAN, fake, { maxFetches: 3 });
