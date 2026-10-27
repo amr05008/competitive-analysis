@@ -21,6 +21,7 @@ problem and exits 5.
 """
 import argparse
 import json
+import re
 import shutil
 import stat
 import subprocess
@@ -52,6 +53,9 @@ CHECK_FAILED = 5
 MAX_FILE_BYTES = 256 * 1024
 MAX_FILES = 512
 EXEMPT_FROM_SIZE = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".woff", ".woff2", ".ttf", ".otf"}
+
+# claude.ai's upload refuses a skill whose description is empty, over this, or holds an XML tag.
+MAX_DESCRIPTION = 1024
 
 
 class PackageError(Exception):
@@ -268,6 +272,36 @@ def check_mcp(files, name, kind, server, problems):
         problems.append(f"{name} points at {url}, which is neither the production nor the staging server")
 
 
+def skill_problems(name, raw):
+    """A SKILL.md's frontmatter as claude.ai's upload reads it."""
+    try:
+        lines = raw.decode("utf-8").split("\n")
+    except UnicodeDecodeError:
+        return [f"{name} isn't UTF-8"]
+    ends = [i for i, line in enumerate(lines) if line.strip() == "---"]
+    if len(ends) < 2 or ends[0] != 0:
+        return [f"{name} has no frontmatter"]
+    fields, key = {}, None
+    for line in lines[1:ends[1]]:
+        if line[:1] not in (" ", "\t") and ":" in line:
+            key, value = line.split(":", 1)
+            key = key.strip()
+            fields[key] = value.strip()
+        elif key:  # a folded or multi-line value
+            fields[key] += " " + line.strip()
+    problems = []
+    description = fields.get("description", "").strip("\"'").strip()
+    if not description:
+        problems.append(f"{name} has no description")
+    elif len(description) > MAX_DESCRIPTION:
+        problems.append(f"{name}'s description is {len(description)} characters; claude.ai allows {MAX_DESCRIPTION}")
+    for field in ("name", "description"):
+        tag = re.search(r"<[^<>]*>", fields.get(field, ""))
+        if tag:
+            problems.append(f"{name}'s {field} has {tag.group(0)}; claude.ai refuses XML tags there")
+    return problems
+
+
 def check(files, links, folders, is_zip, server=None):
     """Every problem with one output. ChatGPT or Claude is read from which manifest it carries."""
     problems = [f"{rel} is a symlink" for rel in links]
@@ -307,6 +341,9 @@ def check(files, links, folders, is_zip, server=None):
 
     required = ["LICENSE", "skills/teardown/SKILL.md", own_mcp] + (["README.md"] if kind == "claude" else [])
     problems += [f"{rel} is missing" for rel in required if rel not in names]
+    for rel in sorted(names):
+        if re.fullmatch(r"skills/[^/]+/SKILL\.md", rel):
+            problems += skill_problems(rel, files[rel])
     if own_mcp in names:
         check_mcp(files, own_mcp, kind, server, problems)
 
