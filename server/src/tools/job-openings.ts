@@ -127,6 +127,8 @@ export async function jobOpenings(
   type Found = Extract<Awaited<ReturnType<typeof fetchBoard>>, { kind: "found" }>;
   let board: Found | null = null;
   let partial = false;
+  /** What each board lookup found, by `ats:slug`. */
+  const outcomes = new Map<string, "found" | "absent" | "error">();
 
   /** One board lookup; false when the budget or the clock ran out first. */
   const tryBoard = async (ats: Ats, slug: string): Promise<boolean> => {
@@ -138,6 +140,7 @@ export async function jobOpenings(
     if (r.kind === "error" && cut) return false;
     const url = r.kind === "found" ? r.apiUrl : r.url;
     if (!tried.includes(url)) tried.push(url); // a board answered from the cache
+    outcomes.set(`${ats}:${slug}`, r.kind === "found" ? "found" : r.kind === "absent" ? "absent" : "error");
     if (r.kind === "found") {
       board = r;
       if (r.departmentsError) {
@@ -166,14 +169,17 @@ export async function jobOpenings(
     }
   }
 
-  // A board found under a guessed name with no role in the last year may be one the company left behind, so
-  // the careers pages are read for the board they name now.
+  // A board found under a guessed name with no roles, or none in the last year, may be one the company left
+  // behind, so the careers pages are read for the board they name now.
   const guessed = board as Found | null;
   const staleNewest = guessed ? staleSince(guessed.roles, deps.now()) : null;
+  const leftBehind = guessed !== null && (staleNewest !== null || guessed.roles.length === 0);
   const careersFailuresBefore = failures.length;
+  /** The board the careers pages name, when it isn't on an EU host. */
+  let named: { ats: Ats; slug: string } | null = null;
   /** Set when the careers pages link to the guessed board itself, so the company does use it. */
   let linksGuessed = false;
-  if ((!guessed || staleNewest) && !stopped) {
+  if ((!guessed || leftBehind) && !stopped) {
     if (budget.exhausted) stopped = true;
     else {
       const refusals = refusedUrls.size;
@@ -191,10 +197,13 @@ export async function jobOpenings(
         // The board is on an EU host, whose API this tool doesn't read: it exists, but wasn't checked.
         const label = link.found.ats === "lever" ? "Lever" : "Greenhouse";
         euNote = `the careers page links to a ${label} board hosted in the EU region, ${euBoardUrl(link.found)}, which wasn't checked`;
-      } else if (link.found && !attempted.has(`${link.found.ats}:${link.found.slug}`)) {
-        if (!(await tryBoard(link.found.ats, link.found.slug))) stopped = true;
-      } else if (link.found && guessed && link.found.ats === guessed.ats && link.found.slug === guessed.slug) {
-        linksGuessed = true;
+      } else if (link.found) {
+        named = link.found;
+        // Board names are matched without regard to case, as the boards' own addresses are.
+        if (guessed && link.found.ats === guessed.ats && link.found.slug.toLowerCase() === guessed.slug.toLowerCase()) linksGuessed = true;
+        else if (!attempted.has(`${link.found.ats}:${link.found.slug}`)) {
+          if (!(await tryBoard(link.found.ats, link.found.slug))) stopped = true;
+        }
       }
     }
   }
@@ -220,17 +229,27 @@ export async function jobOpenings(
     };
   }
 
-  if (guessed && staleNewest) {
+  if (guessed && leftBehind) {
     if (found !== guessed) {
-      notes.push(`the ${guessed.ats} board "${guessed.slug}", found by guessing the name, has no role posted or updated since ${staleNewest}, so the board the company's careers pages name was used instead`);
-    } else if (linksGuessed) {
-      notes.push(`every role on this board was posted or updated more than a year ago (the newest on ${staleNewest}), though the company's careers pages link to it`);
+      const why = staleNewest ? `has no role posted or updated since ${staleNewest}` : "lists no roles";
+      notes.push(`the ${guessed.ats} board "${guessed.slug}", found by guessing the name, ${why}, so the board the company's careers pages name was used instead`);
     } else {
-      const checked = !stopped && !euNote && failures.length === careersFailuresBefore;
-      notes.push(
-        `every role on this board was posted or updated more than a year ago (the newest on ${staleNewest}), so it may be one the company no longer uses${checked ? "; the careers pages name no other board" : ""}`,
-      );
+      const head = staleNewest
+        ? `every role on this board was posted or updated more than a year ago (the newest on ${staleNewest})`
+        : "this board, found by guessing the name, lists no roles";
+      const maybe = ", so it may be one the company no longer uses";
+      const outcome = named ? outcomes.get(`${named.ats}:${named.slug}`) : undefined;
+      let tail = maybe;
+      if (linksGuessed) tail = ", though the company's careers pages link to it";
+      else if (named && outcome === "absent") tail = `${maybe}; the careers pages link to the ${named.ats} board "${named.slug}", which wasn't found`;
+      else if (named && outcome === "error") {
+        tail = `${maybe}; the careers pages link to the ${named.ats} board "${named.slug}", which could not be checked`;
+        partial = true;
+      } else if (!named && !stopped && !euNote && failures.length === careersFailuresBefore) tail = `${maybe}; the careers pages name no other board`;
+      notes.push(head + tail);
     }
+    // The check for a newer board didn't finish, so the board returned may not be the company's current one.
+    if (failures.length > careersFailuresBefore) partial = true;
     if (stopped) {
       noteStop();
       partial = true;

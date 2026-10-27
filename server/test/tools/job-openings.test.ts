@@ -320,8 +320,78 @@ describe("job_openings: a board left behind", () => {
     expect(result.notes.join(" ")).not.toContain("name no other board");
   });
 
-  it("a careers page that fails is noted, and the old board is kept", async () => {
+  it("a careers page that links the old board in other letter case is the same board", async () => {
+    const { result, fetch } = await call(input, { ...left(), [careers("hightouch.com")[0]]: '<a href="https://jobs.ashbyhq.com/Hightouch">Jobs</a>' });
+    expect(result.board?.slug).toBe("hightouch");
+    expect(fetch.calls).not.toContain(ashbyApi("Hightouch"));
+    expect(result.notes.join(" ")).toContain("careers pages link to it");
+    expect(result.notes.join(" ")).not.toContain("used instead");
+  });
+
+  it("a board the careers pages name that couldn't be checked when guessed is partial, never 'no other board'", async () => {
+    const { result } = await call(input, {
+      [gh("hightouch")]: { status: 503 },
+      ...left(),
+      [careers("hightouch.com")[0]]: '<a href="https://boards.greenhouse.io/hightouch">Jobs</a>',
+    });
+    expect(result.status).toBe("partial");
+    expect(result.board?.slug).toBe("hightouch");
+    const note = result.notes.find((n) => n.includes("more than a year ago"));
+    expect(note).toContain('greenhouse board "hightouch", which could not be checked');
+    expect(note).not.toContain("name no other board");
+  });
+
+  it("a board the careers pages name that doesn't exist is said so, and the old board is kept", async () => {
+    const { result, fetch } = await call(input, { ...left(), [careers("hightouch.com")[0]]: '<a href="https://jobs.lever.co/hightouch-old">Jobs</a>' });
+    expect(fetch.calls).toContain(leverApi("hightouch-old"));
+    expect(result.status).toBe("ok");
+    expect(result.board?.slug).toBe("hightouch");
+    const note = result.notes.find((n) => n.includes("more than a year ago"));
+    expect(note).toContain('lever board "hightouch-old", which wasn\'t found');
+    expect(note).not.toContain("name no other board");
+  });
+
+  it("a board the careers pages name that fails is partial, and the old board is kept", async () => {
+    const { result } = await call(input, {
+      ...left(),
+      [careers("hightouch.com")[0]]: '<a href="https://jobs.ashbyhq.com/hightouch-inc">Jobs</a>',
+      [ashbyApi("hightouch-inc")]: { status: 503 },
+    });
+    expect(result.status).toBe("partial");
+    expect(result.board?.slug).toBe("hightouch");
+    expect(result.notes.join(" ")).toContain('ashby board "hightouch-inc", which could not be checked');
+  });
+
+  it("a rate-limited careers page is partial and says to wait", async () => {
+    const { result } = await call(input, { ...left(), [careers("hightouch.com")[0]]: { status: 429 } });
+    expect(result.status).toBe("partial");
+    expect(result.board?.slug).toBe("hightouch");
+    expect(result.notes.join(" ")).toContain("wait a few minutes before calling again");
+  });
+
+  it("a guessed board with no roles gives way to the board a role page names", async () => {
+    const { result } = await call(input, {
+      [ashbyApi("hightouch")]: JSON.stringify({ jobs: [] }),
+      [careers("hightouch.com")[0]]: `<a class="group" href="/careers/${id}">Account Executive</a>`,
+      [rolePage]: `<script>{"applyLink":"https://jobs.ashbyhq.com/hightouch-inc/${id}"}</script>`,
+      [ashbyApi("hightouch-inc")]: JSON.stringify(ashbyBoard(3)),
+    });
+    expect(result.board?.slug).toBe("hightouch-inc");
+    expect(result.notes.find((n) => n.includes('"hightouch"'))).toContain("lists no roles");
+  });
+
+  it("keeps a guessed board with no roles, with a note, when the careers pages name no other", async () => {
+    const { result } = await call(input, { [ashbyApi("hightouch")]: JSON.stringify({ jobs: [] }) });
+    expect(result.status).toBe("ok");
+    expect(result.board?.slug).toBe("hightouch");
+    expect(result.counts?.total).toBe(0);
+    const note = result.notes.find((n) => n.includes("lists no roles"));
+    expect(note).toContain("name no other board");
+  });
+
+  it("a careers page that fails is noted, partial, and the old board is kept", async () => {
     const { result } = await call(input, { ...left(), [careers("hightouch.com")[0]]: { status: 403 } });
+    expect(result.status).toBe("partial");
     expect(result.board?.slug).toBe("hightouch");
     expect(result.notes.join(" ")).toMatch(/careers page .* 403.*the board found above was used/);
     expect(result.notes.join(" ")).toContain("more than a year ago");
