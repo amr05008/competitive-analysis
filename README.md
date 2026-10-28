@@ -5,10 +5,10 @@ company. The method comes from the `competitive-analysis` skill in
 [amr05008/agent-skills](https://github.com/amr05008/agent-skills); this repo packages
 it for the plugin directories. The ChatGPT and Claude versions ship together.
 
-Version 0.2.0 adds the plugin's own MCP server, with tools for page history, job boards,
+Version 0.2 adds the plugin's own MCP server, with tools for page history, job boards,
 Hacker News discussion and SEC filings. The server in `server/` has been live at
 `competitive-analysis.aaronmichaelroy.com` since 2026-10-26; the skill starts using it in
-0.2.0.
+0.2.
 
 ## Layout
 
@@ -46,7 +46,7 @@ Planning notes and the test log are kept outside this repo.
 ## 0.1.0 checklist (skills-only, parked)
 
 0.1.0 was uploaded to OpenAI as a draft but never submitted, because OpenAI stopped taking
-skills-only submissions. The checklist for 0.2.0, the version with the server, is kept with
+skills-only submissions. The checklist for 0.2, the version with the server, is kept with
 the private plans.
 
 - [x] Fetch test passed in ChatGPT (CDX, raw `id_` capture, Greenhouse and Ashby JSON). 2026-10-05
