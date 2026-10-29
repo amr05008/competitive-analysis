@@ -4,7 +4,7 @@ import { MAX_ROLES, RESPONSE_CAP_CHARS, ROLE_DESCRIPTION_MAX_CHARS } from "../..
 import { FALLBACK_LINE } from "../../src/contract/envelope";
 import { jobOpeningsOutput, type JobOpeningsInput, type JobOpeningsResult } from "../../src/contract/tools";
 import { callDeps, type ToolDeps } from "../../src/tools";
-import { jobOpenings } from "../../src/tools/job-openings";
+import { cutAtSpace, jobOpenings } from "../../src/tools/job-openings";
 import { Subrequests } from "../../src/shared/subrequests";
 import { fakeFetch, hangingOn, type FakeFetch, type Route } from "../helpers/fake-fetch";
 import { meter } from "../helpers/meter";
@@ -581,6 +581,13 @@ describe("job_openings: size", () => {
     const { result } = await call({ domain: "acme.io" }, { [ashbyApi("acme")]: JSON.stringify(fat(300, long(ROLE_DESCRIPTION_MAX_CHARS))) });
     expect(result.roles!.length).toBeGreaterThan(0);
     expect(JSON.stringify(result).length).toBeLessThanOrEqual(RESPONSE_CAP_CHARS);
+  });
+
+  it("shortening pay_text never leaves a range open", () => {
+    const s = "The base salary range for this role is $150,000 - $180,000 per year.";
+    const cut = cutAtSpace(s, s.indexOf("$180,000"));
+    expect(cut).toBe("The base salary range for this role is…");
+    expect(cutAtSpace(s, s.length)).toBe(s);
   });
 
   it("the largest result stays under the cap: 5 Greenhouse roles with the longest pay_text", async () => {

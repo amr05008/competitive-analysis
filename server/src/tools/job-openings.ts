@@ -26,8 +26,15 @@ const COUNT_ROWS = [25, 10, 5];
 const DESCRIPTION_CHARS = [Number.POSITIVE_INFINITY, 1500, 800, 300];
 const PAY_TEXT_CHARS = [Number.POSITIVE_INFINITY, 600, 300];
 
-/** `s` cut at the last space within `max`, so no figure is split, with "…" when anything was cut. */
-const cutAtSpace = (s: string, max: number) => (s.length <= max ? s : `${s.slice(0, Math.max(0, s.lastIndexOf(" ", max))).trimEnd()}…`);
+/**
+ * `s` cut at the last space within `max`, so no figure is split, and before a
+ * range whose second figure was cut, with "…" when anything was cut.
+ */
+export const cutAtSpace = (s: string, max: number) => {
+  if (s.length <= max) return s;
+  const head = s.slice(0, Math.max(0, s.lastIndexOf(" ", max))).trimEnd();
+  return `${head.replace(/\s*\S*\d\S*\s+(?:-|–|—|to)$/, "")}…`;
+};
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const clip = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);

@@ -326,6 +326,37 @@ describe("fetchRoleDetail", () => {
       await payOf(`${"a".repeat(160_000)} The salary range is $100,000 - $120,000.`);
       expect(performance.now() - start).toBeLessThan(200);
     });
+
+    // From R73's re-review (2026-10-28).
+    it("reads 60,000 pay figures in one run-on in under 200 ms", async () => {
+      const start = performance.now();
+      await payOf("Salary tier $100,000 - $120,000 ".repeat(30_000));
+      expect(performance.now() - start).toBeLessThan(200);
+    });
+
+    it("reads 80,000 characters of digits and dots in under 200 ms", async () => {
+      const start = performance.now();
+      await payOf(`${"1.".repeat(40_000)} The salary is $100,000.`);
+      expect(performance.now() - start).toBeLessThan(200);
+    });
+
+    it("needs a pay word: a range of contract values or savings isn't pay", async () => {
+      expect(await payOf("Our annual contracts range from $50K to $500K ACV.")).toBeUndefined();
+      expect(await payOf("Customers see savings that range from $1M to $5M per year.")).toBeUndefined();
+      expect(await payOf("Our retention rate is 95% and customers save $50,000 - $100,000.")).toBeUndefined();
+    });
+
+    it("doesn't take perks listed under a compensation heading for pay", async () => {
+      const text = "Compensation & Benefits $1,000 annual home office and learning stipend Up to $5,000 per year for continuing education reimbursement Generous parental leave";
+      expect(await payOf(text)).toBeUndefined();
+    });
+
+    it("reads plain pay: 'Pay:', 'the pay for', 'pays', and a figure per hour", async () => {
+      expect(await payOf("Pay: $100,000 - $120,000 per year.")).toContain("$100,000 - $120,000");
+      expect(await payOf("The pay for this role is $100,000 - $120,000.")).toContain("$100,000 - $120,000");
+      expect(await payOf("This position pays $25 per hour.")).toContain("$25 per hour");
+      expect(await payOf("Starting at $22.50 per hour.")).toContain("$22.50 per hour");
+    });
   });
 
   describe("pay stated only in the text, on Ashby and Lever", () => {

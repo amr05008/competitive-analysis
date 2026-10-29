@@ -51,14 +51,21 @@ const clip = (s: string) => (s.length > ROLE_DESCRIPTION_MAX_CHARS ? s.slice(0, 
 // ------------------------------------------------------------------- pay in the text
 
 const CODES = "USD|EUR|GBP|CAD|AUD|CHF|SGD|INR|JPY";
+// Digits are bounded, so a long run like "1.1.1…" stays linear.
+const NUM = "\\d[\\d,.]{0,20}";
 /** A figure with its currency before it ($150,000, GBP 50,000, $2M) or after it (65.000 €). */
-const MONEY = new RegExp(`[$€£₹]\\s?\\d[\\d,.]*\\s?[kKmM]?\\b|\\b(?:${CODES})\\s?\\d[\\d,.]*\\s?[kKmM]?\\b|\\b\\d[\\d,.]*\\s?(?:€|£|EUR|GBP|USD|CHF)(?![A-Za-z])`, "g");
+const MONEY = new RegExp(`[$€£₹]\\s?${NUM}\\s?[kKmM]?\\b|\\b(?:${CODES})\\s?${NUM}\\s?[kKmM]?\\b|\\b${NUM}\\s?(?:€|£|EUR|GBP|USD|CHF)(?![A-Za-z])`, "g");
 /** The second figure of a range, right after the first. */
 const RANGE_NEXT = new RegExp(`^[^\\S]*(?:-|–|—|to)\\s*(?:[$€£₹]|(?:${CODES})\\s?)?\\d`);
-const PAY_LABEL = /\b(?:salary|salaries|compensation|remuneration|earnings|OTE|wages?|hourly|base (?:pay|salary|compensation|range)|starting base|pay (?:range|rate|band|scale))\b/i;
+const PAY_LABEL =
+  /\b(?:salary|salaries|compensation|remuneration|earnings|OTE|wages?|hourly|base (?:pay|salary|compensation|range)|starting base|pay (?:range|rate|band|scale)|pays|pay\s*:|(?:the|your) pay (?:is|for this (?:role|position)))(?![A-Za-z])/i;
+/** Right after a figure: pay by the hour. */
+const PER_HOUR = /^\s?(?:\/\s?(?:hr|hour)|per hour|an hour|hourly)\b/i;
 const RANGE_WORD = /\b(?:ranges?|rate)\b/i;
-/** Figures that sit beside these words are perks, targets or company numbers, never pay. */
+/** Figures in the same clause as these words are perks, targets or company numbers, never pay. */
 const NOT_PAY = /\b(?:stipends?|budgets?|allowances?|reimburs\w*|quotas?|401\(?k|raised|funding|valuation|revenue|ARR|book of business|deal sizes?|territor(?:y|ies)|pipeline)\b/i;
+/** Where a clause ends, for NOT_PAY: punctuation, "plus", or a slash. */
+const CLAUSE_BREAK = /[,;.!?]\s|\splus\s|\s\/\s/g;
 const MAX_PAY_SNIPPETS = 4;
 
 type Span = { a: number; b: number; score: number };
@@ -76,51 +83,82 @@ const wordEnd = (t: string, min: number, hi: number) => {
   return k > min ? k : hi;
 };
 
+/** The clause around a figure: back to the previous clause break or figure, forward to the next, within a few words. */
+function clauseAround(text: string, f: { i: number; end: number }, prevEnd: number, nextStart: number): string {
+  const back = Math.max(prevEnd, f.i - 40);
+  let lo = back;
+  for (const m of text.slice(back, f.i).matchAll(CLAUSE_BREAK)) lo = back + m.index + m[0].length;
+  let hi = Math.min(nextStart, f.end + 60);
+  const brk = text.slice(f.end, hi).search(CLAUSE_BREAK);
+  if (brk >= 0) hi = f.end + brk;
+  return text.slice(lo, hi);
+}
+
 /**
  * What a posting's text says about pay, for a board whose pay field is empty.
- * Each figure is judged by the words near it: a pay word close before it (or
- * further back, for a range or a list that continues one), and no perk, target
- * or company figure word beside it. A sentence up to PAY_TEXT_MAX_CHARS is kept
- * whole; in a longer run the words around the pay figures are kept, cut only at
- * spaces and never past a figure that isn't pay. At most four pieces, the
- * strongest, in the posting's order.
+ * A figure is pay when a pay word comes before it (close, or further back for a
+ * range or a list that continues one), or it's paid by the hour, and no perk,
+ * target or company-figure word shares its clause. A sentence up to
+ * PAY_TEXT_MAX_CHARS is kept whole; in a longer run the words around the pay
+ * figures are kept, cut only at spaces or after a whole figure, and never past
+ * a figure that isn't pay. At most four pieces, the strongest, in the posting's
+ * order. Each step is one pass, so the cost stays linear in the text.
  */
 function payFromText(text: string): string | undefined {
   const starts = [0];
   for (const m of text.matchAll(/(?<=[.!?])\s+(?=[A-Z(])/g)) starts.push(m.index + m[0].length);
   const sentenceOf = (i: number) => {
-    let k = 0;
-    while (k + 1 < starts.length && starts[k + 1] <= i) k++;
-    return { s: starts[k], e: k + 1 < starts.length ? starts[k + 1] : text.length };
+    let lo = 0;
+    let hi = starts.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (starts[mid] <= i) lo = mid;
+      else hi = mid - 1;
+    }
+    return { s: starts[lo], e: lo + 1 < starts.length ? starts[lo + 1] : text.length };
   };
 
   const figures = [...text.matchAll(MONEY)].map((m) => ({ i: m.index, end: m.index + m[0].length }));
-  const pay: { i: number; end: number; score: number }[] = [];
+  const pay: { i: number; end: number; n: number; score: number }[] = [];
+  const isPay = figures.map(() => false);
   let lastPayEnd = -Infinity;
   figures.forEach((f, n) => {
-    if (NOT_PAY.test(text.slice(Math.max(0, f.i - 30), f.end + 30))) return;
-    const near = text.slice(Math.max(0, f.i - 120), f.end + 40);
-    const far = text.slice(Math.max(0, f.i - 300), f.i);
     const prev = figures[n - 1];
+    const next = figures[n + 1];
+    if (NOT_PAY.test(clauseAround(text, f, prev ? prev.end : 0, next ? next.i : text.length))) return;
+    const label = PAY_LABEL.test(text.slice(Math.max(0, f.i - 120), f.end + 40)) || PER_HOUR.test(text.slice(f.end, f.end + 12)) ? 2 : PAY_LABEL.test(text.slice(Math.max(0, f.i - 300), f.i)) ? 1 : 0;
+    const continues = f.i - lastPayEnd <= 120;
+    if (!label && !continues) return;
     const inRange = RANGE_NEXT.test(text.slice(f.end, f.end + 12)) || (prev !== undefined && RANGE_NEXT.test(text.slice(prev.end, f.end)));
-    const score =
-      (PAY_LABEL.test(near) ? 2 : PAY_LABEL.test(far) ? 1 : 0) +
-      (inRange ? 1 : 0) +
-      (RANGE_WORD.test(text.slice(Math.max(0, f.i - 60), f.i)) ? 1 : 0) +
-      (f.i - lastPayEnd <= 120 ? 1 : 0);
+    const score = label + (inRange ? 1 : 0) + (RANGE_WORD.test(text.slice(Math.max(0, f.i - 60), f.i)) ? 1 : 0) + (continues ? 1 : 0);
     if (score < 2) return;
     // Past 3 a figure is no surer to be pay, so the ranking of pieces stops counting there.
-    pay.push({ ...f, score: Math.min(score, 3) });
+    pay.push({ ...f, n, score: Math.min(score, 3) });
+    isPay[n] = true;
     lastPayEnd = f.end;
   });
   if (!pay.length) return undefined;
+
+  // The nearest figure that isn't pay on each side of every figure, in one pass each way.
+  const nonPayBefore: ({ i: number; end: number } | undefined)[] = [];
+  const nonPayAfter: ({ i: number; end: number } | undefined)[] = [];
+  let seen: { i: number; end: number } | undefined;
+  figures.forEach((f, n) => {
+    nonPayBefore[n] = seen;
+    if (!isPay[n]) seen = f;
+  });
+  seen = undefined;
+  for (let n = figures.length - 1; n >= 0; n--) {
+    nonPayAfter[n] = seen;
+    if (!isPay[n]) seen = figures[n];
+  }
 
   // Each pay figure's piece: its sentence when short, else the words around it, stopping at other figures.
   const spans: Span[] = pay.map((f) => {
     const { s, e } = sentenceOf(f.i);
     if (e - s <= PAY_TEXT_MAX_CHARS) return { a: s, b: e, score: f.score };
-    const before = figures.filter((g) => g.end <= f.i && !pay.some((p) => p.i === g.i)).at(-1);
-    const after = figures.find((g) => g.i >= f.end && !pay.some((p) => p.i === g.i));
+    const before = nonPayBefore[f.n];
+    const after = nonPayAfter[f.n];
     const lo = Math.max(s, f.i - 120, before ? before.end : 0);
     const hi = Math.min(e, f.end + 80, after ? after.i : e);
     return { a: wordStart(text, lo, f.i), b: wordEnd(text, f.end, hi), score: f.score };
