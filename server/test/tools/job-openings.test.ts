@@ -583,6 +583,18 @@ describe("job_openings: size", () => {
     expect(JSON.stringify(result).length).toBeLessThanOrEqual(RESPONSE_CAP_CHARS);
   });
 
+  it("the largest result stays under the cap: 5 Greenhouse roles with the longest pay_text", async () => {
+    const ids = ghJobs.jobs.slice(0, 5).map((j) => String(j.id));
+    // Control characters grow sixfold as JSON, so this pay text is the costliest a posting can give.
+    const content = Array.from({ length: 6 }, (_, i) => `The base salary range in zone ${i} is $${100 + i},000 - $${150 + i},000 ${"\u0001".repeat(240)}.`).join(" ");
+    const routes: Record<string, Route> = { [gh("stripe")]: JSON.stringify(ghJobs), [ghDeps("stripe")]: JSON.stringify(ghDepartments) };
+    for (const id of ids) routes[`https://boards-api.greenhouse.io/v1/boards/stripe/jobs/${id}?pay_transparency=true`] = JSON.stringify({ ...ghDetail, content });
+    const { result } = await call({ domain: "stripe.com", role_ids: ids }, routes);
+    expect(result.roles).toHaveLength(5);
+    expect(result.roles!.every((r) => (r.pay_text ?? "").includes("$100,000 - $150,000"))).toBe(true);
+    expect(JSON.stringify(result).length).toBeLessThanOrEqual(RESPONSE_CAP_CHARS);
+  });
+
   it("the largest result stays under the cap: 5 roles with descriptions", async () => {
     const ids = [0, 1, 2, 3, 4].map((i) => `role-${i}`);
     const { result } = await call({ domain: "acme.io", role_ids: ids }, { [ashbyApi("acme")]: JSON.stringify(fat(300, long(ROLE_DESCRIPTION_MAX_CHARS))) });

@@ -17,6 +17,8 @@ export type RawRole = {
   link: string;
   /** Plain text, capped. Only Ashby and Lever list it; a Greenhouse description is a separate request. */
   description?: string;
+  /** The pay the whole description states, when `pay` is null. Only Ashby and Lever list it. */
+  payText?: string;
 };
 
 export type Board =
@@ -39,35 +41,121 @@ function decodeEntities(s: string): string {
 }
 
 const collapse = (s: string) => s.replace(/\s+/g, " ").trim();
-const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,}/gi;
+// Parts are bounded, so a long run with no spaces stays linear.
+const EMAIL = /[A-Z0-9._%+-]{1,64}@[A-Z0-9-]{1,63}(?:\.[A-Z0-9-]{1,63}){0,8}\.[A-Z]{2,24}/gi;
 const PHONE = /(?:\+\d{1,3}[\s.-]?)?(?:\(\d{2,4}\)|\d{2,4})[\s.-]\d{3,4}[\s.-]\d{3,4}/g;
 
 const scrub = (s: string) => s.replace(EMAIL, "[email removed]").replace(PHONE, "[phone removed]");
+const clip = (s: string) => (s.length > ROLE_DESCRIPTION_MAX_CHARS ? s.slice(0, ROLE_DESCRIPTION_MAX_CHARS) : s);
 
-/** A description as stored: email addresses and phone numbers removed, then capped. */
-const cap = (s: string) => {
-  const clean = scrub(s);
-  return clean.length > ROLE_DESCRIPTION_MAX_CHARS ? clean.slice(0, ROLE_DESCRIPTION_MAX_CHARS) : clean;
+// ------------------------------------------------------------------- pay in the text
+
+const CODES = "USD|EUR|GBP|CAD|AUD|CHF|SGD|INR|JPY";
+/** A figure with its currency before it ($150,000, GBP 50,000, $2M) or after it (65.000 €). */
+const MONEY = new RegExp(`[$€£₹]\\s?\\d[\\d,.]*\\s?[kKmM]?\\b|\\b(?:${CODES})\\s?\\d[\\d,.]*\\s?[kKmM]?\\b|\\b\\d[\\d,.]*\\s?(?:€|£|EUR|GBP|USD|CHF)(?![A-Za-z])`, "g");
+/** The second figure of a range, right after the first. */
+const RANGE_NEXT = new RegExp(`^[^\\S]*(?:-|–|—|to)\\s*(?:[$€£₹]|(?:${CODES})\\s?)?\\d`);
+const PAY_LABEL = /\b(?:salary|salaries|compensation|remuneration|earnings|OTE|wages?|hourly|base (?:pay|salary|compensation|range)|starting base|pay (?:range|rate|band|scale))\b/i;
+const RANGE_WORD = /\b(?:ranges?|rate)\b/i;
+/** Figures that sit beside these words are perks, targets or company numbers, never pay. */
+const NOT_PAY = /\b(?:stipends?|budgets?|allowances?|reimburs\w*|quotas?|401\(?k|raised|funding|valuation|revenue|ARR|book of business|deal sizes?|territor(?:y|ies)|pipeline)\b/i;
+const MAX_PAY_SNIPPETS = 4;
+
+type Span = { a: number; b: number; score: number };
+
+/** `lo` moved forward to the start of a whole word, but not past `max`. */
+const wordStart = (t: string, lo: number, max: number) => {
+  if (lo === 0 || /\s/.test(t[lo - 1])) return lo;
+  const m = /\s/.exec(t.slice(lo, max));
+  return m ? lo + m.index + 1 : max;
+};
+/** `hi` moved back to the end of a whole word, but not before `min`. */
+const wordEnd = (t: string, min: number, hi: number) => {
+  if (hi >= t.length || /\s/.test(t[hi])) return hi;
+  const k = t.lastIndexOf(" ", hi);
+  return k > min ? k : hi;
 };
 
-const MONEY = /[$€£]\s?\d|\b(?:USD|EUR|GBP|CAD|AUD)\s?\d/;
-const PAY_WORD = /\b(?:pay|salary|salaries|compensation|earnings|OTE|wages?|range)\b/i;
-const MAX_PAY_SENTENCES = 3;
-
 /**
- * The sentences of a posting that state its pay, for a board whose pay field is
- * empty: each has a figure and a pay word. A run-on stretch with no full stop is
- * cut to the words around its first figure first, so the pay word must be near it.
+ * What a posting's text says about pay, for a board whose pay field is empty.
+ * Each figure is judged by the words near it: a pay word close before it (or
+ * further back, for a range or a list that continues one), and no perk, target
+ * or company figure word beside it. A sentence up to PAY_TEXT_MAX_CHARS is kept
+ * whole; in a longer run the words around the pay figures are kept, cut only at
+ * spaces and never past a figure that isn't pay. At most four pieces, the
+ * strongest, in the posting's order.
  */
 function payFromText(text: string): string | undefined {
-  const found = text
-    .split(/(?<=[.!?])\s+(?=[A-Z(])/)
-    .filter((s) => MONEY.test(s))
-    .map((s) => (s.length <= PAY_TEXT_MAX_CHARS ? s : s.slice(Math.max(0, s.search(MONEY) - 100)).slice(0, PAY_TEXT_MAX_CHARS).trim()))
-    .filter((s) => PAY_WORD.test(s))
-    .slice(0, MAX_PAY_SENTENCES);
-  return found.length ? found.join(" ") : undefined;
+  const starts = [0];
+  for (const m of text.matchAll(/(?<=[.!?])\s+(?=[A-Z(])/g)) starts.push(m.index + m[0].length);
+  const sentenceOf = (i: number) => {
+    let k = 0;
+    while (k + 1 < starts.length && starts[k + 1] <= i) k++;
+    return { s: starts[k], e: k + 1 < starts.length ? starts[k + 1] : text.length };
+  };
+
+  const figures = [...text.matchAll(MONEY)].map((m) => ({ i: m.index, end: m.index + m[0].length }));
+  const pay: { i: number; end: number; score: number }[] = [];
+  let lastPayEnd = -Infinity;
+  figures.forEach((f, n) => {
+    if (NOT_PAY.test(text.slice(Math.max(0, f.i - 30), f.end + 30))) return;
+    const near = text.slice(Math.max(0, f.i - 120), f.end + 40);
+    const far = text.slice(Math.max(0, f.i - 300), f.i);
+    const prev = figures[n - 1];
+    const inRange = RANGE_NEXT.test(text.slice(f.end, f.end + 12)) || (prev !== undefined && RANGE_NEXT.test(text.slice(prev.end, f.end)));
+    const score =
+      (PAY_LABEL.test(near) ? 2 : PAY_LABEL.test(far) ? 1 : 0) +
+      (inRange ? 1 : 0) +
+      (RANGE_WORD.test(text.slice(Math.max(0, f.i - 60), f.i)) ? 1 : 0) +
+      (f.i - lastPayEnd <= 120 ? 1 : 0);
+    if (score < 2) return;
+    // Past 3 a figure is no surer to be pay, so the ranking of pieces stops counting there.
+    pay.push({ ...f, score: Math.min(score, 3) });
+    lastPayEnd = f.end;
+  });
+  if (!pay.length) return undefined;
+
+  // Each pay figure's piece: its sentence when short, else the words around it, stopping at other figures.
+  const spans: Span[] = pay.map((f) => {
+    const { s, e } = sentenceOf(f.i);
+    if (e - s <= PAY_TEXT_MAX_CHARS) return { a: s, b: e, score: f.score };
+    const before = figures.filter((g) => g.end <= f.i && !pay.some((p) => p.i === g.i)).at(-1);
+    const after = figures.find((g) => g.i >= f.end && !pay.some((p) => p.i === g.i));
+    const lo = Math.max(s, f.i - 120, before ? before.end : 0);
+    const hi = Math.min(e, f.end + 80, after ? after.i : e);
+    return { a: wordStart(text, lo, f.i), b: wordEnd(text, f.end, hi), score: f.score };
+  });
+  const merged: Span[] = [];
+  for (const sp of spans) {
+    const last = merged.at(-1);
+    if (last && sp.a < last.b) {
+      last.b = Math.max(last.b, sp.b);
+      last.score = Math.max(last.score, sp.score);
+    } else merged.push({ ...sp });
+  }
+
+  const kept = [...merged]
+    .sort((x, y) => y.score - x.score || x.a - y.a)
+    .slice(0, MAX_PAY_SNIPPETS)
+    .sort((x, y) => x.a - y.a);
+  return kept
+    .map(({ a, b }) => {
+      const { s, e } = sentenceOf(a);
+      let end = b;
+      if (b - a > PAY_TEXT_MAX_CHARS * 2) {
+        // Cut after the last whole pay figure that fits and doesn't open a range.
+        const whole = pay.filter((f) => f.i >= a && f.end - a <= PAY_TEXT_MAX_CHARS * 2 && !RANGE_NEXT.test(text.slice(f.end, f.end + 12)));
+        end = whole.length ? whole[whole.length - 1].end : a + text.slice(a, a + PAY_TEXT_MAX_CHARS * 2).lastIndexOf(" ");
+      }
+      const piece = text.slice(a, end).trim();
+      const cut = end < e && text.slice(end, e).trim() !== "";
+      return `${a > s ? "…" : ""}${piece}${cut ? "…" : ""}`;
+    })
+    .join(" ");
 }
+
+/** The pay a posting's whole text states, for a role whose pay field is empty; the text is already scrubbed. */
+const payTextFor = (pay: string | null, clean: string) => (pay === null ? payFromText(clean) : undefined);
 
 /** HTML, possibly escaped, as plain text: entities decoded, tags stripped, whitespace collapsed. */
 export function htmlToText(html: string): string {
@@ -146,7 +234,7 @@ function greenhousePay(ranges: unknown): string | null {
 
 const GH_API = "https://boards-api.greenhouse.io/v1/boards";
 /** Starts every cache key; bump the version when a cached shape changes, so old entries are never read. */
-const KEY = "boards:v1";
+const KEY = "boards:v2";
 
 function apiUrl(ats: Ats, slug: string): string {
   const s = encodeURIComponent(slug);
@@ -205,6 +293,9 @@ function ashbyRoles(jobs: unknown[]): RawRole[] {
     if (!id || !title || !link || j.isListed !== true) return [];
     const comp = isObj(j.compensation) ? str(j.compensation.compensationTierSummary) : null;
     const description = str(j.descriptionPlain);
+    const clean = description ? scrub(collapse(description)) : null;
+    const pay = j.shouldDisplayCompensationOnJobPostings === true ? comp : null;
+    const payText = clean ? payTextFor(pay, clean) : undefined;
     return [
       {
         id,
@@ -213,9 +304,10 @@ function ashbyRoles(jobs: unknown[]): RawRole[] {
         location: str(j.location),
         date: day(j.publishedAt),
         dateKind: "posted",
-        pay: j.shouldDisplayCompensationOnJobPostings === true ? comp : null,
+        pay,
         link,
-        ...(description ? { description: cap(collapse(description)) } : {}),
+        ...(clean ? { description: clip(clean) } : {}),
+        ...(payText ? { payText } : {}),
       } satisfies RawRole,
     ];
   });
@@ -238,6 +330,9 @@ function leverRoles(postings: unknown[]): RawRole[] {
     const cats = isObj(p.categories) ? p.categories : {};
     const sr = isObj(p.salaryRange) ? p.salaryRange : null;
     const description = leverDescription(p);
+    const clean = description ? scrub(description) : null;
+    const pay = sr ? range(sr.currency, sr.min, sr.max, leverInterval(sr.interval)) : null;
+    const payText = clean ? payTextFor(pay, clean) : undefined;
     return [
       {
         id,
@@ -246,9 +341,10 @@ function leverRoles(postings: unknown[]): RawRole[] {
         location: str(cats.location),
         date: day(p.createdAt),
         dateKind: "posted",
-        pay: sr ? range(sr.currency, sr.min, sr.max, leverInterval(sr.interval)) : null,
+        pay,
         link,
-        ...(description ? { description: cap(description) } : {}),
+        ...(clean ? { description: clip(clean) } : {}),
+        ...(payText ? { payText } : {}),
       } satisfies RawRole,
     ];
   });
@@ -325,15 +421,15 @@ export async function fetchRoleDetail(
 ): Promise<{ ok: true; description: string; pay: string | null; /** The pay the posting's text states, when the pay field is empty. */ payText?: string } | FailedOutcome> {
   if (ats !== "greenhouse") {
     const url = apiUrl(ats, slug);
-    if (listed?.description) return { ok: true, description: listed.description, pay: listed.pay };
+    if (listed?.description) return { ok: true, description: listed.description, pay: listed.pay, ...(listed.payText ? { payText: listed.payText } : {}) };
     return { ok: false, reason: "not_found", url, detail: "the board lists no description for this role" };
   }
   const url = `${GH_API}/${encodeURIComponent(slug)}/jobs/${encodeURIComponent(id)}?pay_transparency=true`;
   const r = await getJson(fetcher, url);
   if (!r.ok) return r;
   if (!isObj(r.data)) return unexpected(url);
-  const text = htmlToText(typeof r.data.content === "string" ? r.data.content : "");
+  const clean = scrub(htmlToText(typeof r.data.content === "string" ? r.data.content : ""));
   const pay = greenhousePay(r.data.pay_input_ranges);
-  const payText = pay === null ? payFromText(scrub(text)) : undefined;
-  return { ok: true, description: cap(text), pay, ...(payText ? { payText } : {}) };
+  const payText = payTextFor(pay, clean);
+  return { ok: true, description: clip(clean), pay, ...(payText ? { payText } : {}) };
 }

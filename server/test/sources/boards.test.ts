@@ -192,7 +192,7 @@ describe("board cache keys", () => {
   it("carry the adapter and its version", async () => {
     const cache = await freshCache();
     await fetchBoard(fakeFetch({ [LEVER]: json(lever) }), cache, "lever", "palantir");
-    const key = `https://cache.competitive-analysis.invalid/${encodeURIComponent("boards:v1:lever:palantir")}`;
+    const key = `https://cache.competitive-analysis.invalid/${encodeURIComponent("boards:v2:lever:palantir")}`;
     expect(await cache.match(key)).toBeDefined();
   });
 });
@@ -257,6 +257,94 @@ describe("fetchRoleDetail", () => {
       if (!r.ok || !r.payText) throw new Error("expected pay text");
       expect(r.payText).toContain("Salary: $100,000 - $120,000 per year");
       expect(r.payText.length).toBeLessThanOrEqual(300);
+    });
+
+    // From R73's fresh review (2026-10-28).
+    const payOf = async (text: string) => {
+      const r = await fetchRoleDetail(fakeFetch({ [DETAIL]: json(withContent(text)) }), "greenhouse", "stripe", String(ghDetail.id));
+      if (!r.ok) throw new Error("expected a description");
+      return r.payText;
+    };
+    const perks = "Perks and benefits " + "comprehensive medical dental and vision coverage for you and your family ".repeat(4);
+
+    it("doesn't take a stipend in a run-on list for the pay that follows it", async () => {
+      const text = `${perks}home office stipend of $1,000 a $2,000 annual learning budget wellness allowance of $50 a month Compensation The base salary range for this role is $150,000 - $180,000 USD.`;
+      const pay = await payOf(text);
+      expect(pay).toContain("$150,000 - $180,000 USD");
+      expect(pay).not.toMatch(/\$1,000|\$2,000|\$50\b/);
+    });
+
+    it("keeps every zone of a zone list whole", async () => {
+      const zones =
+        "Zone A (San Francisco Bay Area, New York City metro, Seattle metro): $175,000 - $219,000 " +
+        "Zone B (Boston, Los Angeles, Washington D.C. metro, San Diego): $166,000 - $208,000 " +
+        "Zone C (Austin, Chicago, Denver, Portland, Philadelphia, Miami): $157,000 - $196,000 " +
+        "Zone D (all other US locations, including remote employees): $149,000 - $186,000";
+      const pay = await payOf(`${perks}The salary range for this role is: ${zones} ${perks}`);
+      for (const r of ["$175,000 - $219,000", "$166,000 - $208,000", "$157,000 - $196,000", "$149,000 - $186,000"]) expect(pay).toContain(r);
+    });
+
+    it("never cuts a figure in two", async () => {
+      const tiers = Array.from({ length: 30 }, (_, i) => `Tier ${i + 1}: $${100 + i},000 - $${150 + i},000`).join(" ");
+      const pay = await payOf(`${perks}The salary range for this role is ${tiers} ${perks}`);
+      expect(pay).toContain("Tier 1: $100,000 - $150,000");
+      for (const figure of pay!.match(/\$[\d,]+/g)!) expect(figure).toMatch(/^\$\d{3},000$/);
+    });
+
+    it("ignores stipends, budgets and quotas, even beside a pay word", async () => {
+      expect(await payOf("You'll get a $1,500 learning stipend and a wide range of benefits.")).toBeUndefined();
+      expect(await payOf("We offer a $500 stipend to pay for your home office setup.")).toBeUndefined();
+      expect(await payOf("You'll carry a $2M quota on top of base pay.")).toBeUndefined();
+    });
+
+    it("keeps at most four sentences, in the posting's order", async () => {
+      const cities = ["New York", "Seattle", "Austin", "Denver", "Chicago"];
+      const pay = await payOf(cities.map((c, i) => `The base salary range in ${c} is $${200 - i * 10},000 - $${240 - i * 10},000.`).join(" "));
+      expect(pay).toBe(cities.slice(0, 4).map((c, i) => `The base salary range in ${c} is $${200 - i * 10},000 - $${240 - i * 10},000.`).join(" "));
+    });
+
+    it("removes email addresses and phone numbers from the pay it keeps", async () => {
+      const pay = await payOf("The salary range is $100,000 - $120,000, and questions go to jobs@example.com or 415-555-0100.");
+      expect(pay).toContain("$100,000 - $120,000");
+      expect(pay).toContain("[email removed]");
+      expect(pay).toContain("[phone removed]");
+    });
+
+    it("reads euros, pounds and a currency written after the figure", async () => {
+      expect(await payOf("The salary range for this role is €60,000 – €75,000.")).toContain("€60,000 – €75,000");
+      expect(await payOf("Salary: GBP 50,000 to GBP 60,000 per year.")).toContain("GBP 50,000 to GBP 60,000");
+      expect(await payOf("The annual salary is 65.000 € to 80.000 € depending on experience.")).toContain("65.000 € to 80.000 €");
+    });
+
+    it("reads an hourly rate and a starting base", async () => {
+      expect(await payOf("The hourly rate for this role ranges from $25.00 to $35.00.")).toContain("$25.00 to $35.00");
+      expect(await payOf("The starting base for this role is $140,000.")).toContain("$140,000");
+    });
+
+    it("reads a long run of text with no spaces in under 200 ms", async () => {
+      const start = performance.now();
+      await payOf(`${"a".repeat(160_000)} The salary range is $100,000 - $120,000.`);
+      expect(performance.now() - start).toBeLessThan(200);
+    });
+  });
+
+  describe("pay stated only in the text, on Ashby and Lever", () => {
+    it("Lever: a role with no salaryRange gets the pay its text states", async () => {
+      const r = await fetchBoard(fakeFetch({ [LEVER]: json(lever) }), await freshCache(), "lever", "palantir");
+      if (r.kind !== "found") throw new Error("expected a board");
+      const role = r.roles.find((x) => x.id === "a237973c-cb29-41fe-9c80-416e6f42e087")!;
+      expect(role.pay).toBeNull();
+      const d = await fetchRoleDetail(fakeFetch({}), "lever", "palantir", role.id, role);
+      expect(d.ok && d.payText).toContain("$60,000 - $97,000/year");
+    });
+
+    it("Ashby: pay past the description cap, with compensation hidden, still reaches payText", async () => {
+      const job = { ...ashby.jobs[0], shouldDisplayCompensationOnJobPostings: false, descriptionPlain: `${"About the role and the team. ".repeat(120)}The base salary range for this role is $150,000 - $180,000.` };
+      const r = await fetchBoard(fakeFetch({ [ASHBY]: json({ jobs: [job] }) }), await freshCache(), "ashby", "hightouch");
+      if (r.kind !== "found") throw new Error("expected a board");
+      expect(r.roles[0].description).not.toContain("$150,000");
+      const d = await fetchRoleDetail(fakeFetch({}), "ashby", "hightouch", r.roles[0].id, r.roles[0]);
+      expect(d.ok && d.payText).toContain("$150,000 - $180,000");
     });
   });
 

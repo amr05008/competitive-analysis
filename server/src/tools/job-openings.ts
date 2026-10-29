@@ -21,9 +21,13 @@ const MAX_DETAIL_CHARS = 200;
 /** The longest role id echoed back in a note. */
 const MAX_ECHO_CHARS = 100;
 
-/** How much of the count tables, then of each description, then of the role list is kept to fit the cap. */
+/** How much of the count tables, then of each description, then of each pay_text, then of the role list is kept to fit the cap. */
 const COUNT_ROWS = [25, 10, 5];
 const DESCRIPTION_CHARS = [Number.POSITIVE_INFINITY, 1500, 800, 300];
+const PAY_TEXT_CHARS = [Number.POSITIVE_INFINITY, 600, 300];
+
+/** `s` cut at the last space within `max`, so no figure is split, with "…" when anything was cut. */
+const cutAtSpace = (s: string, max: number) => (s.length <= max ? s : `${s.slice(0, Math.max(0, s.lastIndexOf(" ", max))).trimEnd()}…`);
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const clip = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
@@ -310,7 +314,7 @@ export async function jobOpenings(
   const byLocation = countBy(all, "location");
   const status = partial ? "partial" : "ok";
 
-  const assemble = (rows: number, descChars: number, shown: number): JobOpeningsResult => {
+  const assemble = (rows: number, descChars: number, shown: number, payChars = PAY_TEXT_CHARS[0]): JobOpeningsResult => {
     const extra: string[] = [];
     let listNote: string[] = [];
     const counts: Counts = { total: all.length, by_department: byDepartment.slice(0, rows), by_location: byLocation.slice(0, rows) };
@@ -318,8 +322,13 @@ export async function jobOpenings(
     if (byLocation.length > rows) extra.push(`showing the top ${rows} of ${plural(byLocation.length, "location")}`);
     let roles: Role[];
     if (detailed) {
-      roles = detailed.map((r) => (r.description === undefined ? r : { ...r, description: r.description.slice(0, descChars) }));
+      roles = detailed.map((r) => ({
+        ...r,
+        ...(r.description === undefined ? {} : { description: r.description.slice(0, descChars) }),
+        ...(r.pay_text === undefined ? {} : { pay_text: cutAtSpace(r.pay_text, payChars) }),
+      }));
       if (descChars < Number.POSITIVE_INFINITY) extra.push("descriptions are shortened to fit the response size");
+      if (payChars < Number.POSITIVE_INFINITY) extra.push("pay_text is shortened to fit the response size");
     } else {
       roles = all.slice(0, shown).map((r) => toRole(r));
       if (all.length > shown) {
@@ -338,13 +347,15 @@ export async function jobOpenings(
     };
   };
 
-  // Fewer count rows first, then shorter descriptions, then fewer roles, until the result fits.
+  // Fewer count rows first, then shorter descriptions, then shorter pay_text, then fewer roles, until the result fits.
   const fits = (r: JobOpeningsResult) => JSON.stringify(r).length <= RESPONSE_CAP_CHARS;
   const startShown = Math.min(MAX_ROLES, all.length);
   let result = assemble(COUNT_ROWS[0], DESCRIPTION_CHARS[0], startShown);
   for (const rows of COUNT_ROWS.slice(1)) if (!fits(result)) result = assemble(rows, DESCRIPTION_CHARS[0], startShown);
   const rows = COUNT_ROWS[COUNT_ROWS.length - 1];
   for (const d of DESCRIPTION_CHARS.slice(1)) if (!fits(result) && detailed) result = assemble(rows, d, startShown);
+  const shortest = DESCRIPTION_CHARS[DESCRIPTION_CHARS.length - 1];
+  for (const p of PAY_TEXT_CHARS.slice(1)) if (!fits(result) && detailed) result = assemble(rows, shortest, startShown, p);
   for (let shown = startShown - 1; !fits(result) && shown >= 0 && !detailed; shown--) {
     result = assemble(rows, DESCRIPTION_CHARS[0], shown);
   }

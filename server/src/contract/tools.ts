@@ -171,7 +171,7 @@ export const jobOpeningsOutput = {
         pay_text: z
           .string()
           .optional()
-          .describe("The sentences of the posting that state its pay, when the board's pay field is empty; present only for roles asked for by role_ids."),
+          .describe("The posting's own words about its pay (whole sentences, or the words around the figures with … where cut), when the board's pay field is empty; present only for roles asked for by role_ids."),
         link: z.string().describe("A link to the role's posting."),
         description: z
           .string()
