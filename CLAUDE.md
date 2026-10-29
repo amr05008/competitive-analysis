@@ -97,7 +97,17 @@ The Claude loop uses the same staging build:
 - **claude.ai:** in **Customize > Plugins**, remove the old upload, upload
   `dist/competitive-analysis-<version>-claude-staging.zip`, connect it on the plugin's
   **Connectors** tab, then start a new chat.
-- **Claude Code:** `claude --plugin-dir dist/claude-local`. Remove the user-scope
-  `competitive-analysis-staging` server first, or the tools appear twice. A plain teardown
-  prompt loads Aaron's private `competitive-analysis` skill instead, so park that skill or
-  name the tools.
+- **Claude Code:** the claude.ai upload syncs into Claude Code (`competitive-analysis@synced`)
+  when a new session starts, so test there; `--plugin-dir dist/claude-local` on top of it
+  loads the plugin twice. A plain teardown prompt can load Aaron's private
+  `competitive-analysis` skill instead, so check which skill fired.
+- **Evals:** `evals/` holds three cases (Hightouch, ZeroClick, and server busy with a mocked
+  server). After the staging build, run `claude plugin eval dist/claude-local --mocks record
+  --allow-real-servers --allow-tools "mcp__plugin_competitive-analysis_competitive-analysis__*"
+  WebFetch WebSearch --no-publish --judge-model sonnet --max-cost-usd 25 --trust-plugin`.
+  Runs are isolated from Aaron's plugins and skills and go one at a time (staging's archive
+  queue holds three); one pass of the three cases costs about $3, and `--runs 3 --ablation
+  with-without` (each case three times, with and without the plugin) about $16 and an hour.
+  Results land in `dist/claude-local/evals/results/`, with each run's final message but not
+  its tool calls. The traces are written in each run's scaffold folder, which `--keep-temp`
+  keeps.
