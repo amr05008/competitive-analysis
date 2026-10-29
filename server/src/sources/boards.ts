@@ -1,4 +1,4 @@
-import { BOARD_MAX_BYTES, ROLE_DESCRIPTION_MAX_CHARS, TTL_BOARD } from "../config";
+import { BOARD_MAX_BYTES, PAY_TEXT_MAX_CHARS, ROLE_DESCRIPTION_MAX_CHARS, TTL_BOARD } from "../config";
 import { utcDay } from "../contract/envelope";
 import type { ErrorReason } from "../contract/envelope";
 import type { Ats } from "../contract/tools";
@@ -42,11 +42,32 @@ const collapse = (s: string) => s.replace(/\s+/g, " ").trim();
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,}/gi;
 const PHONE = /(?:\+\d{1,3}[\s.-]?)?(?:\(\d{2,4}\)|\d{2,4})[\s.-]\d{3,4}[\s.-]\d{3,4}/g;
 
+const scrub = (s: string) => s.replace(EMAIL, "[email removed]").replace(PHONE, "[phone removed]");
+
 /** A description as stored: email addresses and phone numbers removed, then capped. */
 const cap = (s: string) => {
-  const clean = s.replace(EMAIL, "[email removed]").replace(PHONE, "[phone removed]");
+  const clean = scrub(s);
   return clean.length > ROLE_DESCRIPTION_MAX_CHARS ? clean.slice(0, ROLE_DESCRIPTION_MAX_CHARS) : clean;
 };
+
+const MONEY = /[$€£]\s?\d|\b(?:USD|EUR|GBP|CAD|AUD)\s?\d/;
+const PAY_WORD = /\b(?:pay|salary|salaries|compensation|earnings|OTE|wages?|range)\b/i;
+const MAX_PAY_SENTENCES = 3;
+
+/**
+ * The sentences of a posting that state its pay, for a board whose pay field is
+ * empty: each has a figure and a pay word. A run-on stretch with no full stop is
+ * cut to the words around its first figure first, so the pay word must be near it.
+ */
+function payFromText(text: string): string | undefined {
+  const found = text
+    .split(/(?<=[.!?])\s+(?=[A-Z(])/)
+    .filter((s) => MONEY.test(s))
+    .map((s) => (s.length <= PAY_TEXT_MAX_CHARS ? s : s.slice(Math.max(0, s.search(MONEY) - 100)).slice(0, PAY_TEXT_MAX_CHARS).trim()))
+    .filter((s) => PAY_WORD.test(s))
+    .slice(0, MAX_PAY_SENTENCES);
+  return found.length ? found.join(" ") : undefined;
+}
 
 /** HTML, possibly escaped, as plain text: entities decoded, tags stripped, whitespace collapsed. */
 export function htmlToText(html: string): string {
@@ -301,7 +322,7 @@ export async function fetchRoleDetail(
   slug: string,
   id: string,
   listed?: RawRole,
-): Promise<{ ok: true; description: string; pay: string | null } | FailedOutcome> {
+): Promise<{ ok: true; description: string; pay: string | null; /** The pay the posting's text states, when the pay field is empty. */ payText?: string } | FailedOutcome> {
   if (ats !== "greenhouse") {
     const url = apiUrl(ats, slug);
     if (listed?.description) return { ok: true, description: listed.description, pay: listed.pay };
@@ -311,6 +332,8 @@ export async function fetchRoleDetail(
   const r = await getJson(fetcher, url);
   if (!r.ok) return r;
   if (!isObj(r.data)) return unexpected(url);
-  const content = typeof r.data.content === "string" ? r.data.content : "";
-  return { ok: true, description: cap(htmlToText(content)), pay: greenhousePay(r.data.pay_input_ranges) };
+  const text = htmlToText(typeof r.data.content === "string" ? r.data.content : "");
+  const pay = greenhousePay(r.data.pay_input_ranges);
+  const payText = pay === null ? payFromText(scrub(text)) : undefined;
+  return { ok: true, description: cap(text), pay, ...(payText ? { payText } : {}) };
 }

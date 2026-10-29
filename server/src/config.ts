@@ -63,6 +63,8 @@ export const MAX_ROLES = 40;
 export const MAX_ROLE_IDS = 5;
 /** The most characters of one role's description. */
 export const ROLE_DESCRIPTION_MAX_CHARS = 3_000;
+/** The most characters of one sentence of pay a posting states in its text. */
+export const PAY_TEXT_MAX_CHARS = 300;
 /** The most bytes read from one careers page. */
 export const CAREERS_MAX_BYTES = 512_000;
 /** The most bytes read from one job board's role list (a large Lever board is several megabytes). */

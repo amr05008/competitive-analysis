@@ -5,6 +5,7 @@ import { findBoardLink } from "../../src/sources/careers";
 import { fakeFetch } from "../helpers/fake-fetch";
 import ashby from "../fixtures/boards/ashby-hightouch.json";
 import careersAshby from "../fixtures/boards/careers-ashby-link.html?raw";
+import atDetail from "../fixtures/boards/greenhouse-airtable-job-detail.json";
 import ghDepartments from "../fixtures/boards/greenhouse-stripe-departments.json";
 import ghDetail from "../fixtures/boards/greenhouse-stripe-job-detail.json";
 import ghJobs from "../fixtures/boards/greenhouse-stripe-jobs.json";
@@ -218,6 +219,45 @@ describe("fetchRoleDetail", () => {
     const withPay = { ...ghDetail, pay_input_ranges: [{ min_cents: 18000000, max_cents: 24000000, currency_type: "USD", title: "US", blurb: "" }] };
     const r = await fetchRoleDetail(fakeFetch({ [DETAIL]: json(withPay) }), "greenhouse", "stripe", String(ghDetail.id));
     expect(r.ok && r.pay).toBe("USD 180,000–240,000");
+  });
+
+  describe("pay stated only in the posting's text", () => {
+    // Airtable leaves Greenhouse's pay field empty and states its ranges near the end of the
+    // posting, past the description cap (Run 28, 2026-10-28).
+    const AT_DETAIL = `https://boards-api.greenhouse.io/v1/boards/airtable/jobs/${atDetail.id}?pay_transparency=true`;
+    const withContent = (text: string) => ({ ...ghDetail, content: `&lt;p&gt;${text}&lt;/p&gt;` });
+
+    it("keeps the pay sentences when the pay field is empty, though the cap cuts them from the description", async () => {
+      const r = await fetchRoleDetail(fakeFetch({ [AT_DETAIL]: json(atDetail) }), "greenhouse", "airtable", String(atDetail.id));
+      if (!r.ok) throw new Error("expected a description");
+      expect(r.pay).toBeNull();
+      expect(r.description).toHaveLength(ROLE_DESCRIPTION_MAX_CHARS);
+      expect(r.description).not.toContain("$272,000");
+      expect(r.payText).toBe(
+        "For work locations in the San Francisco Bay Area, Seattle, Los Angeles, and New York, the on-target earnings range for this role is $272,000 - $354,000 USD. " +
+          "For all other work locations (including remote), the range is $245,000 – $319,000 USD.",
+      );
+    });
+
+    it("ignores a figure with no pay word, such as a book of business", async () => {
+      const r = await fetchRoleDetail(fakeFetch({ [DETAIL]: json(withContent("You will own a $2M book of business. Salary is competitive.")) }), "greenhouse", "stripe", String(ghDetail.id));
+      expect(r.ok && r.payText).toBeUndefined();
+    });
+
+    it("isn't given when the pay field has the range", async () => {
+      const both = { ...withContent("The base salary range for this role is $180,000 to $240,000."), pay_input_ranges: [{ min_cents: 18000000, max_cents: 24000000, currency_type: "USD", title: "US", blurb: "" }] };
+      const r = await fetchRoleDetail(fakeFetch({ [DETAIL]: json(both) }), "greenhouse", "stripe", String(ghDetail.id));
+      expect(r.ok && r.pay).toBe("USD 180,000–240,000");
+      expect(r.ok && r.payText).toBeUndefined();
+    });
+
+    it("keeps the words around the figure when list items run together with no full stop", async () => {
+      const text = `Benefits ${"generous perks and ".repeat(40)}Salary: $100,000 - $120,000 per year ${"plus more perks and ".repeat(40)}`;
+      const r = await fetchRoleDetail(fakeFetch({ [DETAIL]: json(withContent(text)) }), "greenhouse", "stripe", String(ghDetail.id));
+      if (!r.ok || !r.payText) throw new Error("expected pay text");
+      expect(r.payText).toContain("Salary: $100,000 - $120,000 per year");
+      expect(r.payText.length).toBeLessThanOrEqual(300);
+    });
   });
 
   it("removes email addresses and phone numbers from descriptions, in every ATS", async () => {

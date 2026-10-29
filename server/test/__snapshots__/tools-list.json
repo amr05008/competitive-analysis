@@ -561,11 +561,15 @@
                   "description": "Whether date is when the role was posted or last updated."
                 },
                 "pay": {
-                  "description": "The pay range as the board publishes it, or null when it doesn't.",
+                  "description": "The pay range from the board's pay field, or null when that field is empty (see pay_text).",
                   "type": [
                     "string",
                     "null"
                   ]
+                },
+                "pay_text": {
+                  "description": "The sentences of the posting that state its pay, when the board's pay field is empty; present only for roles asked for by role_ids.",
+                  "type": "string"
                 },
                 "link": {
                   "type": "string",

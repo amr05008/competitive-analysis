@@ -263,7 +263,7 @@ export async function jobOpenings(
 
   // The roles asked for by id, with descriptions; otherwise the newest.
   const all = newestFirst(found.roles);
-  const toRole = (r: RawRole, extra: { description?: string; pay?: string | null } = {}): Role => ({
+  const toRole = (r: RawRole, extra: { description?: string; pay?: string | null; payText?: string } = {}): Role => ({
     id: r.id,
     title: clip(r.title, MAX_TITLE_CHARS),
     department: label(r.department, MAX_LABEL_CHARS),
@@ -271,6 +271,7 @@ export async function jobOpenings(
     date: r.date,
     date_kind: r.dateKind,
     pay: extra.pay === undefined ? r.pay : extra.pay,
+    ...(extra.payText === undefined ? {} : { pay_text: extra.payText }),
     link: r.link,
     ...(extra.description === undefined ? {} : { description: extra.description }),
   });
@@ -291,7 +292,7 @@ export async function jobOpenings(
       }
       const refusals = refusedUrls.size;
       const d = await fetchRoleDetail(gate, found.ats, found.slug, r.id, r);
-      if (d.ok) detailed.push(toRole(r, { description: d.description, pay: d.pay ?? r.pay }));
+      if (d.ok) detailed.push(toRole(r, { description: d.description, pay: d.pay ?? r.pay, payText: d.payText }));
       else {
         if (refusedUrls.size > refusals || budget.cut) noteStop();
         else {

@@ -167,7 +167,11 @@ export const jobOpeningsOutput = {
         location: z.string().nullable().describe("The role's location, or null when the board gives none."),
         date: z.string().nullable().describe("The date the board gives for the role, or null when it gives none."),
         date_kind: z.enum(["posted", "updated"]).describe("Whether date is when the role was posted or last updated."),
-        pay: z.string().nullable().describe("The pay range as the board publishes it, or null when it doesn't."),
+        pay: z.string().nullable().describe("The pay range from the board's pay field, or null when that field is empty (see pay_text)."),
+        pay_text: z
+          .string()
+          .optional()
+          .describe("The sentences of the posting that state its pay, when the board's pay field is empty; present only for roles asked for by role_ids."),
         link: z.string().describe("A link to the role's posting."),
         description: z
           .string()

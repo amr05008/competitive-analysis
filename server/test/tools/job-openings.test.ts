@@ -10,6 +10,7 @@ import { fakeFetch, hangingOn, type FakeFetch, type Route } from "../helpers/fak
 import { meter } from "../helpers/meter";
 import ashbyHightouch from "../fixtures/boards/ashby-hightouch.json";
 import careersAshby from "../fixtures/boards/careers-ashby-link.html?raw";
+import atDetail from "../fixtures/boards/greenhouse-airtable-job-detail.json";
 import ghDepartments from "../fixtures/boards/greenhouse-stripe-departments.json";
 import ghDetail from "../fixtures/boards/greenhouse-stripe-job-detail.json";
 import ghJobs from "../fixtures/boards/greenhouse-stripe-jobs.json";
@@ -504,6 +505,28 @@ describe("job_openings: roles", () => {
     expect(result.roles).toHaveLength(1);
     expect(result.roles![0].description).toContain("Who we are");
     expect(result.status).toBe("ok");
+  });
+
+  it("a role whose pay is only in its posting's text gets pay_text, and pay stays null", async () => {
+    const id = String(ghDetail.id);
+    const detail = `https://boards-api.greenhouse.io/v1/boards/stripe/jobs/${id}?pay_transparency=true`;
+    const { result } = await call(
+      { domain: "stripe.com", role_ids: [id] },
+      { [gh("stripe")]: JSON.stringify(ghJobs), [ghDeps("stripe")]: JSON.stringify(ghDepartments), [detail]: JSON.stringify({ ...ghDetail, content: atDetail.content }) },
+    );
+    expect(result.roles![0].pay).toBeNull();
+    expect(result.roles![0].pay_text).toContain("$272,000 - $354,000 USD");
+    expect(result.roles![0].pay_text).toContain("$245,000 – $319,000 USD");
+  });
+
+  it("a role with no pay in its text has no pay_text", async () => {
+    const id = String(ghDetail.id);
+    const detail = `https://boards-api.greenhouse.io/v1/boards/stripe/jobs/${id}?pay_transparency=true`;
+    const { result } = await call(
+      { domain: "stripe.com", role_ids: [id] },
+      { [gh("stripe")]: JSON.stringify(ghJobs), [ghDeps("stripe")]: JSON.stringify(ghDepartments), [detail]: JSON.stringify(ghDetail) },
+    );
+    expect(result.roles![0]).not.toHaveProperty("pay_text");
   });
 
   it("a description that can't be fetched leaves a note and the role without it", async () => {
