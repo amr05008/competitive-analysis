@@ -1,7 +1,7 @@
 {
   "name": "competitive-analysis",
   "displayName": "Competitive Analysis",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Evidence-graded teardown of one company: positioning history, job-listing mining, contradictions, absence as evidence, and a label on every claim.",
   "author": {
     "name": "Aaron Roy",
