@@ -1,5 +1,5 @@
 ---
-version: 0.2.2
+version: 0.2.3
 name: Competitive Analysis
 subtitle: Research companies and URLs
 category: Business & Operations
@@ -29,7 +29,7 @@ This plugin researches companies, not people. To get the most from this plugin, 
 
 Newest first. Every upload needs a new version above and a matching heading here. The newest one goes out with that version.
 
-### 0.2.2
+### 0.2.3
 
 Competitive Analysis now has its own server. Four read-only tools pull the evidence that browsing alone kept missing: when a company's homepage and pricing copy changed (from Wayback Machine captures), its open roles from a public Greenhouse, Lever or Ashby board, Hacker News discussion by year, and SEC filings, including Form D fundraising notices. The tools only read free public sources, need no sign-in and keep no personal data. If the server is busy or down, the teardown still finishes with the app's own browsing and lists what it couldn't check.
 
