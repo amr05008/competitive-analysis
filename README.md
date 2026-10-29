@@ -39,6 +39,8 @@ Hacker News discussion and SEC filings. The server in `server/` has been live at
 - `relay/`: a Vercel Function that makes the server's Wayback Machine requests, because the
   archive rate-limits Cloudflare's network. Never in the zip. See
   [`relay/README.md`](relay/README.md).
+- `evals/`: `claude plugin eval` cases (Hightouch, ZeroClick, and a mocked busy server).
+  The build copies them into `dist/claude-local/`; never in the zip.
 - `LICENSE`: MIT.
 
 Planning notes and the test log are kept outside this repo.

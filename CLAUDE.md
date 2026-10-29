@@ -30,8 +30,8 @@ session logs keep the old name as history.
 - `scripts/package.py`, run by `build.sh`, writes each host's package from `plugin/` and
   checks it, and checks `plugin/` against the directory's file limits. Production writes the
   OpenAI upload zip and the Claude zip; both builds write `dist/chatgpt-local/` (what the
-  ChatGPT app installs) and `dist/claude-local/` (for `claude --plugin-dir`, plus `evals/`
-  when it exists). `local/` (git-ignored) holds Aaron's ChatGPT app mappings,
+  ChatGPT app installs) and `dist/claude-local/` (what `claude plugin eval` runs, with
+  `evals/` copied in). `local/` (git-ignored) holds Aaron's ChatGPT app mappings,
   `local/chatgpt-app-<server>.json`, which go into `dist/chatgpt-local/` and nowhere else.
 - The method's source of truth is the `competitive-analysis` skill in the private
   `claude-channels` repo, mirrored publicly to `amr05008/agent-skills`.
