@@ -101,6 +101,10 @@ instead.
 - To test a failure alert locally, put `DISCORD_WEBHOOK_URL` and `SELF_CHECK_FORCE_FAIL=1` in
   `.dev.vars` (git ignores it), run `npx wrangler dev --test-scheduled`, and open
   `http://localhost:8787/__scheduled?cron=5+13+*+*+*`. The forced failure works only in dev.
+- `GET /.well-known/openai-apps-challenge` serves OpenAI's domain-verification token as plain
+  text, from the `OPENAI_APPS_CHALLENGE` secret
+  (`npx wrangler secret put OPENAI_APPS_CHALLENGE --env production`). Unset, it's a 404. The
+  token is tied to the publisher's OpenAI account, so it stays out of git.
 - Cache keys start with the environment's name and a version per source, since staging and
   production share one zone's cache. Bump a source's version when its cached shape changes.
 - The compatibility date (2026-08-15) is the newest the test pool's bundled workerd supports,

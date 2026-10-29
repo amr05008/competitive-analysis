@@ -7,6 +7,8 @@ interface Env {
   ARCHIVE_RELAY_URL?: string;
   /** The archive relay's shared token (`wrangler secret put`). */
   ARCHIVE_RELAY_TOKEN?: string;
+  /** OpenAI's domain-verification token, served at /.well-known/openai-apps-challenge (`wrangler secret put`). */
+  OPENAI_APPS_CHALLENGE?: string;
   /** In .dev.vars only; honored just when ENVIRONMENT is dev. Marks every self-check failed. */
   SELF_CHECK_FORCE_FAIL?: string;
 }

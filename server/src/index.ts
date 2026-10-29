@@ -9,6 +9,14 @@ export default {
     const { pathname } = new URL(req.url);
     if (pathname === "/" && (req.method === "GET" || req.method === "HEAD")) return aboutPage(req);
     if (pathname === "/mcp") return handleMcp(req, env, ctx);
+    if (
+      pathname === "/.well-known/openai-apps-challenge" &&
+      (req.method === "GET" || req.method === "HEAD") &&
+      env.OPENAI_APPS_CHALLENGE
+    ) {
+      const body = req.method === "HEAD" ? null : env.OPENAI_APPS_CHALLENGE;
+      return new Response(body, { headers: { "content-type": "text/plain; charset=utf-8" } });
+    }
     return new Response("Not found\n", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
   },
   async scheduled(controller, env, ctx): Promise<void> {

@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { errorResult } from "../src/contract/envelope";
 import type { JobOpeningsResult } from "../src/contract/tools";
+import worker from "../src/index";
 import { makeDeps, runTool } from "../src/mcp";
 import { IMPLEMENTATIONS, type ToolDeps } from "../src/tools";
 import { rpc } from "./helpers/mcp";
@@ -39,6 +40,53 @@ describe("about page and routing", () => {
     expect(res.status).toBe(405);
     expect(res.headers.get("allow")).toBe("POST");
     await res.body?.cancel();
+  });
+});
+
+describe("OpenAI's domain-verification token", () => {
+  const PATH = "https://server.test/.well-known/openai-apps-challenge";
+  const TOKEN = "challenge-token-1234";
+  const call = async (url: string, challenge: string | undefined, method = "GET") => {
+    const e = { ...env, OPENAI_APPS_CHALLENGE: challenge } as Env;
+    const ctx = createExecutionContext();
+    const res = await worker.fetch(new Request(url, { method }), e, ctx);
+    await waitOnExecutionContext(ctx);
+    return res;
+  };
+
+  it("GET returns exactly the token as plain text", async () => {
+    const res = await call(PATH, TOKEN);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toMatch(/^text\/plain/);
+    expect(await res.text()).toBe(TOKEN);
+  });
+
+  it("HEAD returns 200 with no body", async () => {
+    const res = await call(PATH, TOKEN, "HEAD");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toMatch(/^text\/plain/);
+    expect(await res.text()).toBe("");
+  });
+
+  it.each([
+    ["unset", undefined],
+    ["empty", ""],
+  ])("returns 404 when the token is %s", async (_, challenge) => {
+    const res = await call(PATH, challenge);
+    expect(res.status).toBe(404);
+    expect(await res.text()).not.toContain(TOKEN);
+  });
+
+  it("returns 404 for any other /.well-known path", async () => {
+    const res = await call("https://server.test/.well-known/anything-else", TOKEN);
+    expect(res.status).toBe(404);
+    expect(await res.text()).not.toContain(TOKEN);
+  });
+
+  it("never returns the token to a POST", async () => {
+    const res = await call(PATH, TOKEN, "POST");
+    expect([404, 405]).toContain(res.status);
+    expect(await res.text()).not.toContain(TOKEN);
   });
 });
 
