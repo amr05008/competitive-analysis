@@ -156,7 +156,7 @@ describe("scheduled self-check", () => {
     expect(jobs.posts[0]!.body.content).toBe("competitive-analysis self-check (production) failed:\n- job_openings: no board found");
     const sec = fakeFetcher();
     await runScheduled(prod(), createExecutionContext(), "15 13 * * *", NOW, { run, fetcher: sec.fetcher });
-    expect(sec.posts.map((p) => p.body.content)).toEqual(["competitive-analysis self-check (production) failed:\n- sec_filings: error source_unavailable"]);
+    expect(sec.posts.map((p) => p.body.content)).toEqual(["competitive-analysis self-check (production) failed:\n- sec_filings: error source_unavailable: EDGAR down"]);
   });
 
   it("self-check calls run with selfCheck true", async () => {

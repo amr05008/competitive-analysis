@@ -21,7 +21,10 @@ function threeMonthsBefore(now: number): string {
 }
 
 function errorDetail(result: ToolResult): string | null {
-  return result.status === "error" ? `error ${result.error?.reason ?? "unknown"}` : null;
+  if (result.status !== "error") return null;
+  // The detail is the only record of why: the server keeps no logs.
+  const detail = result.error?.detail ? `: ${result.error.detail}` : "";
+  return `error ${result.error?.reason ?? "unknown"}${detail}`;
 }
 
 export const SELF_CHECKS: SelfCheck[] = [
