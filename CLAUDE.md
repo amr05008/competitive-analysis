@@ -47,6 +47,10 @@ session logs keep the old name as history.
   `plugin.json`; the rest of `plugin.json` (URLs, icons, ids) is edited by hand. Aaron edits
   the listing in Obsidian: `listing/` is symlinked into his vault at
   `_areas/competitive-analysis/listing`, so only add frontmatter fields `listing.py` knows.
+  The site pages' copy (project, privacy, terms) isn't here: it's
+  `src/content/competitive-analysis/` in `~/repos/aaronroy.com`, which he edits through the
+  vault's `_areas/competitive-analysis/site`. A stray file in `listing/` fails the production
+  build's clean-tree check.
   His private status notes (dashboard links, review history, update checklist) are in
   `_areas/competitive-analysis/competitive-analysis-reference.md` in the vault, not here.
 - `plans/` is a **git-ignored symlink** to Aaron's private vault
