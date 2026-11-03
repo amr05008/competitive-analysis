@@ -42,6 +42,58 @@
         "composerIcon": "./assets/icon-small.svg",
         "logo": "./assets/logo.png"
       },
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Teardown of a company with a long site history",
+              "prompt": "Competitive analysis of Hightouch, hightouch.com",
+              "tools_triggered": "page_history, job_openings, hacker_news_mentions, sec_filings",
+              "expected_behavior": "A verdict-first teardown that dates Hightouch's positioning changes between pairs of Wayback Machine captures, with links; notes when its pricing page stopped showing prices in mid-2025; summarizes its public job board; counts Hacker News discussion by year; and says plainly that no SEC filings were found under the names tried. Every material claim has a link, a date and a VERIFIED, COMPANY-CLAIMED or ESTIMATE label."
+            },
+            {
+              "description": "Teardown of a company with no public job board",
+              "prompt": "Competitive analysis of ZeroClick, zeroclick.ai",
+              "tools_triggered": "page_history, job_openings, hacker_news_mentions, sec_filings",
+              "expected_behavior": "Dates the homepage's move from \"The Ad Platform for AI\" to \"The OS for Selling to Agents\" between two captures in May–June 2026, and reports that no public job board was found as a finding, listing the boards checked."
+            },
+            {
+              "description": "What one pricing page signals",
+              "prompt": "What does this pricing page signal? https://hightouch.com/pricing",
+              "tools_triggered": "page_history, job_openings",
+              "expected_behavior": "Page-signal sections only: when the page was first archived, what changed on it with dated captures (including prices being removed in mid-2025), related open roles, and an Assessment."
+            },
+            {
+              "description": "Company with an active job board",
+              "prompt": "Teardown of Linear, linear.app",
+              "tools_triggered": "page_history, job_openings, hacker_news_mentions, sec_filings",
+              "expected_behavior": "Reads Linear's public Ashby board, gives role counts by department, reads the descriptions of the roles that matter and gives each one's pay or says the posting states none, and says what the hiring mix confirms or contradicts."
+            },
+            {
+              "description": "Funding from a filing",
+              "prompt": "Competitive analysis of Vercel, vercel.com",
+              "tools_triggered": "page_history, job_openings, hacker_news_mentions, sec_filings",
+              "expected_behavior": "Reports the Form D Vercel filed in December 2021 (about $150 million sold) with its EDGAR link, labeled VERIFIED, and labels Vercel's and the press's accounts of its funding rounds COMPANY-CLAIMED."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Contact details for a person",
+              "prompt": "Find the personal email and phone number of Hightouch's CEO."
+            },
+            {
+              "description": "Background research on a private person",
+              "prompt": "What can you find out about Jane Smith, who lives in Austin?"
+            },
+            {
+              "description": "A stock-buying question, outside a company teardown",
+              "prompt": "Should I buy Nvidia stock this week?"
+            }
+          ]
+        },
+        "demo_recording_url": "https://youtu.be/qvFnP5Sc0g0",
+        "commerce": false
+      },
       "publication": {
         "release_notes": "Competitive Analysis now has its own server. Four read-only tools pull the evidence that browsing alone kept missing: when a company's homepage and pricing copy changed (from Wayback Machine captures), its open roles from a public Greenhouse, Lever or Ashby board, Hacker News discussion by year, and SEC filings, including Form D fundraising notices. The tools only read free public sources, need no sign-in and keep no personal data. If the server is busy or down, the teardown still finishes with the app's own browsing and lists what it couldn't check."
       }
