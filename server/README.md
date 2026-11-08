@@ -96,7 +96,8 @@ instead.
   free plan's 50 per request; staging and production set 900 on the paid plan.
 - The daily self-check runs one tool per Cron Trigger, at 13:00, 13:05, 13:10 and 13:15 UTC
   (`SCHEDULE` in `src/selfcheck.ts`), so each invocation stays within its subrequest and CPU
-  limits. The Monday usage summary goes with 13:00. The crons belong to production only; any
+  limits. The Monday usage summary goes with 13:00: the week's calls per tool and outcome, then
+  one line per UTC day. Self-check calls aren't counted. The crons belong to production only; any
   other cron does nothing. A test fails if `[env.production.triggers]` and `SCHEDULE` differ.
 - To test a failure alert locally, put `DISCORD_WEBHOOK_URL` and `SELF_CHECK_FORCE_FAIL=1` in
   `.dev.vars` (git ignores it), run `npx wrangler dev --test-scheduled`, and open
