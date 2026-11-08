@@ -106,11 +106,28 @@ export async function runSelfCheck(
 }
 
 const OUTCOME_ORDER: readonly string[] = ["ok", "partial", ...ERROR_REASONS];
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/** One line of anonymous counts per tool, for the days from `fromDay` to `toDay`. */
+/** One day's line: its calls, then each tool that had any. Outcomes stay in the weekly line. */
+function dayLine(rows: UsageRow[], day: string): string {
+  const label = `- ${WEEKDAYS[new Date(Date.parse(day)).getUTCDay()]} ${day}: `;
+  const perTool = TOOL_NAMES.map((tool) => [tool, rows.filter((r) => r.day === day && r.tool === tool).reduce((sum, r) => sum + r.n, 0)] as const).filter(
+    ([, n]) => n > 0,
+  );
+  if (perTool.length === 0) return `${label}no calls`;
+  const total = perTool.reduce((sum, [, n]) => sum + n, 0);
+  return `${label}${total} ${total === 1 ? "call" : "calls"} (${perTool.map(([tool, n]) => `${tool} ${n}`).join(", ")})`;
+}
+
+/**
+ * Anonymous counts for the days from `fromDay` to `toDay`: a line with each tool's total and outcomes,
+ * then a line per UTC day with its calls per tool.
+ */
 export function weeklySummary(rows: UsageRow[], fromDay: string, toDay: string): string {
   const head = `competitive-analysis usage, ${fromDay} to ${toDay}: `;
   if (rows.length === 0) return `${head}no calls this week`;
+  const days: string[] = [];
+  for (let t = Date.parse(fromDay); t <= Date.parse(toDay); t += DAY_MS) days.push(utcDay(t));
   const parts = TOOL_NAMES.map((tool) => {
     const byOutcome = new Map<string, number>();
     for (const row of rows) if (row.tool === tool) byOutcome.set(row.outcome, (byOutcome.get(row.outcome) ?? 0) + row.n);
@@ -122,7 +139,7 @@ export function weeklySummary(rows: UsageRow[], fromDay: string, toDay: string):
       .join(", ");
     return `${tool} ${total} (${detail})`;
   });
-  return head + parts.join("; ");
+  return [head + parts.join("; "), ...days.map((day) => dayLine(rows, day))].join("\n");
 }
 
 /**

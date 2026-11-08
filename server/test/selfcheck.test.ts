@@ -1,12 +1,13 @@
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { errorResult } from "../src/contract/envelope";
-import type { ToolName, ToolResult } from "../src/contract/tools";
+import { ERROR_REASONS, errorResult } from "../src/contract/envelope";
+import { TOOL_NAMES, type ToolName, type ToolResult } from "../src/contract/tools";
 import type { runTool } from "../src/mcp";
 import { SCHEDULE, SELF_CHECKS, runScheduled, runSelfCheck, weeklySummary } from "../src/selfcheck";
 import { USER_AGENT } from "../src/config";
-import { postDiscord } from "../src/discord";
+import { DISCORD_MAX_CHARS, postDiscord } from "../src/discord";
+import type { UsageRow } from "../src/shared/usage-store";
 import wranglerToml from "../wrangler.toml?raw";
 
 const NOW = Date.parse("2026-10-24T06:00:00Z"); // a Saturday
@@ -224,17 +225,42 @@ describe("scheduled self-check", () => {
 });
 
 describe("weeklySummary", () => {
+  const rows = [
+    { day: "2026-10-19", tool: "page_history", outcome: "ok", n: 6 },
+    { day: "2026-10-20", tool: "page_history", outcome: "ok", n: 4 },
+    { day: "2026-10-20", tool: "page_history", outcome: "partial", n: 1 },
+    { day: "2026-10-21", tool: "page_history", outcome: "server_busy", n: 1 },
+    { day: "2026-10-21", tool: "sec_filings", outcome: "not_found", n: 2 },
+  ] as const;
+
   it("lists each tool's total and outcomes, and none for tools without rows", () => {
-    const rows = [
-      { day: "2026-10-19", tool: "page_history", outcome: "ok", n: 6 },
-      { day: "2026-10-20", tool: "page_history", outcome: "ok", n: 4 },
-      { day: "2026-10-20", tool: "page_history", outcome: "partial", n: 1 },
-      { day: "2026-10-21", tool: "page_history", outcome: "server_busy", n: 1 },
-      { day: "2026-10-21", tool: "sec_filings", outcome: "not_found", n: 2 },
-    ] as const;
-    expect(weeklySummary([...rows], "2026-10-19", "2026-10-25")).toBe(
+    expect(weeklySummary([...rows], "2026-10-19", "2026-10-25").split("\n")[0]).toBe(
       "competitive-analysis usage, 2026-10-19 to 2026-10-25: page_history 12 (ok 10, partial 1, server_busy 1); job_openings none; hacker_news_mentions none; sec_filings 2 (not_found 2)",
     );
+  });
+
+  it("adds a line per day with its weekday, calls per tool, and no calls for empty days", () => {
+    expect(weeklySummary([...rows], "2026-10-19", "2026-10-25").split("\n").slice(1)).toEqual([
+      "- Mon 2026-10-19: 6 calls (page_history 6)",
+      "- Tue 2026-10-20: 5 calls (page_history 5)",
+      "- Wed 2026-10-21: 3 calls (page_history 1, sec_filings 2)",
+      "- Thu 2026-10-22: no calls",
+      "- Fri 2026-10-23: no calls",
+      "- Sat 2026-10-24: no calls",
+      "- Sun 2026-10-25: no calls",
+    ]);
+  });
+
+  it("says 1 call, not 1 calls", () => {
+    const one = [{ day: "2026-10-19", tool: "job_openings", outcome: "ok", n: 1 }] as const;
+    expect(weeklySummary([...one], "2026-10-19", "2026-10-25").split("\n")[1]).toBe("- Mon 2026-10-19: 1 call (job_openings 1)");
+  });
+
+  it("fits a Discord message uncut in a week with every tool and outcome at the daily cap every day", () => {
+    const days = ["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25"];
+    const outcomes = ["ok", "partial", ...ERROR_REASONS];
+    const full = days.flatMap((day) => TOOL_NAMES.flatMap((tool) => outcomes.map((outcome) => ({ day, tool, outcome, n: 1000 }))));
+    expect(weeklySummary(full as UsageRow[], "2026-10-19", "2026-10-25").length).toBeLessThanOrEqual(DISCORD_MAX_CHARS);
   });
 
   it("reads no calls this week when empty", () => {
