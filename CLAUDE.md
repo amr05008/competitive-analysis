@@ -1,9 +1,10 @@
 # Competitive Analysis — repo notes for agents
 
 A ChatGPT/Codex and Claude plugin: **Competitive Analysis**, plugin id
-`competitive-analysis`, one skill with id `teardown`. It packages the method of Aaron's
-private `competitive-analysis` skill. The two are separate skills, and the private one keeps
-its name, so `/competitive-analysis` on Aaron's machines still opens the private version.
+`competitive-analysis`, one skill with id `teardown`. **This repo's `teardown` skill is the
+method's source of truth.** Aaron's private `house-teardown` skill is a layer on top of it:
+it copies `plugin/skills/teardown/` from a release tag, so each tagged release is followed by
+a re-sync there. Nothing flows the other way except deliberate edits made here.
 Released so far as skills-only (0.1.0, never published). OpenAI stopped taking skills-only
 submissions, so 0.2 adds the plugin's own MCP server in `server/`, in production since
 2026-10-26 at `competitive-analysis.aaronmichaelroy.com`, with staging alongside. The ChatGPT and Claude versions ship together. 0.2.3 went to
@@ -35,10 +36,11 @@ session logs keep the old name as history.
   ChatGPT app installs) and `dist/claude-local/` (what `claude plugin eval` runs, with
   `evals/` copied in). `local/` (git-ignored) holds Aaron's ChatGPT app mappings,
   `local/chatgpt-app-<server>.json`, which go into `dist/chatgpt-local/` and nowhere else.
-- The method's source of truth is the `competitive-analysis` skill in the private
-  `claude-channels` repo, mirrored publicly to `amr05008/agent-skills`.
-  `plugin/skills/teardown/references/report-template.md` is **generated** by
-  `scripts/build.sh` from the agent-skills checkout. Never edit it here.
+- `plugin/skills/teardown/references/report-template.md` is the report contract, a source
+  file here since 2026-11-09 (before that, `build.sh` generated it from agent-skills). Edit
+  it in a release like `SKILL.md`. Its first line still says
+  "Generated… Do not edit here"; remove that line with the first edit of the next release,
+  not before, because it's in the 0.2.3 package.
 - The store listing's source is `listing/competitive-analysis-listing.md`: version, name,
   subtitle, category and prompts in its frontmatter, the description and release notes in its
   body. `scripts/build.sh` (via `scripts/listing.py`) copies them into `plugin/plugin.json`
@@ -80,8 +82,8 @@ session logs keep the old name as history.
   field, or a reply. Users connect their own Exa/Firecrawl/Monid.
 - Teardowns are of companies, not people. No enrichment, no contact data.
 - Write "the model", never a model name, in `SKILL.md`.
-- Nothing in the public `claude-channels` skill's harness layer (house config, fan-out,
-  Artifact, INTERNAL, Monid CLI) belongs here.
+- Nothing from Aaron's private `house-teardown` layer (house config, social reader,
+  Artifact, paid-source CLIs, operator profile) belongs here.
 - Commit and push straight to `main` until a live version is listed in a directory. After
   that, feature branches and PRs.
 - This repo is public. Plans, designs, run logs and anything about Aaron's accounts or limits
@@ -105,8 +107,9 @@ The Claude loop uses the same staging build:
   **Connectors** tab, then start a new chat.
 - **Claude Code:** the claude.ai upload syncs into Claude Code (`competitive-analysis@synced`)
   when a new session starts, so test there; `--plugin-dir dist/claude-local` on top of it
-  loads the plugin twice. A plain teardown prompt can load Aaron's private
-  `competitive-analysis` skill instead, so check which skill fired.
+  loads the plugin twice. On Aaron's machines a plain teardown prompt goes to his private
+  `house-teardown` skill, so name the plugin's skill (`/competitive-analysis:teardown`) and
+  check which skill fired.
 - **Evals:** `evals/` holds three cases (Hightouch, ZeroClick, and server busy with a mocked
   server). After the staging build, run `claude plugin eval dist/claude-local --mocks record
   --allow-real-servers --allow-tools "mcp__plugin_competitive-analysis_competitive-analysis__*"

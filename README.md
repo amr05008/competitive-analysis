@@ -1,9 +1,10 @@
 # Competitive Analysis
 
 A ChatGPT/Codex and Claude plugin that produces an evidence-graded teardown of one
-company. The method comes from the `competitive-analysis` skill in
-[amr05008/agent-skills](https://github.com/amr05008/agent-skills); this repo packages
-it for the plugin directories. The ChatGPT and Claude versions ship together.
+company. The method lives here, in `plugin/skills/teardown`; it started as the
+`competitive-analysis` skill in
+[amr05008/agent-skills](https://github.com/amr05008/agent-skills). The ChatGPT and Claude
+versions ship together.
 
 Version 0.2 adds the plugin's own MCP server, with tools for page history, job boards,
 Hacker News discussion and SEC filings. The server in `server/` has been live at
@@ -26,12 +27,13 @@ Hacker News discussion and SEC filings. The server in `server/` has been live at
     sends and fetches.
   - `skills/teardown/SKILL.md`: the method, written for a model with a browser and
     whatever plugins the user connected.
-  - `skills/teardown/references/report-template.md`: **generated** by
-    `scripts/build.sh` from agent-skills; the report contract has one source.
+  - `skills/teardown/references/report-template.md`: the report contract, edited here
+    like `SKILL.md`. Its first line still says it was generated from agent-skills, which
+    was true until 2026-11-09; the next release removes it.
   - `assets/`: icon and logo.
   - `LICENSE`: a copy of the root `LICENSE`; the build checks that they match.
-- `scripts/build.sh`: regenerates the two generated files, checks the listing limits and
-  vendor names, and has `scripts/package.py` write and check each host's package in
+- `scripts/build.sh`: regenerates the manifests' listing fields, checks the listing limits
+  and vendor names, and has `scripts/package.py` write and check each host's package in
   `dist/`: the OpenAI upload zip, the Claude zip, and local test folders for both apps.
   `--server staging` builds the test folders against the staging server.
 - `server/`: the MCP server, a Cloudflare Worker. Public code, and it never goes in the
