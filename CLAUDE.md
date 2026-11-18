@@ -5,11 +5,13 @@ A ChatGPT/Codex and Claude plugin: **Competitive Analysis**, plugin id
 method's source of truth.** Aaron's private `house-teardown` skill is a layer on top of it:
 it copies `plugin/skills/teardown/` from a release tag, so each tagged release is followed by
 a re-sync there. Nothing flows the other way except deliberate edits made here.
-Released so far as skills-only (0.1.0, never published). OpenAI stopped taking skills-only
-submissions, so 0.2 adds the plugin's own MCP server in `server/`, in production since
-2026-10-26 at `competitive-analysis.aaronmichaelroy.com`, with staging alongside. The ChatGPT and Claude versions ship together. 0.2.3 went to
-OpenAI's review on 2026-11-02: while it's in review, deploy nothing to production that
-changes what the tools return. Start at § Pick up here in
+0.1.0 was skills-only and never published. OpenAI stopped taking skills-only submissions,
+so 0.2 adds the plugin's own MCP server in `server/`, in production since 2026-10-26 at
+`competitive-analysis.aaronmichaelroy.com`, with staging alongside. The ChatGPT and Claude
+versions ship together. **0.2.3 is live in ChatGPT's plugin directory since 2026-11-17**
+(`chatgpt.com/plugins/plugin_asdk_app_6ae934b3a1648191b35968ae36210e13`). Production now
+serves its users: ship server changes through `server/README.md` § Releases, staging and
+the live check first. Start at § Pick up here in
 `plans/next-steps-2026-10-05.md`. Formerly "Worry Or Not" (renamed 2026-10-11); plans and
 session logs keep the old name as history.
 
@@ -84,8 +86,8 @@ session logs keep the old name as history.
 - Write "the model", never a model name, in `SKILL.md`.
 - Nothing from Aaron's private `house-teardown` layer (house config, social reader,
   Artifact, paid-source CLIs, operator profile) belongs here.
-- Commit and push straight to `main` until a live version is listed in a directory. After
-  that, feature branches and PRs.
+- Feature branches and PRs, never straight to `main`: a live version is listed since
+  2026-11-17.
 - This repo is public. Plans, designs, run logs and anything about Aaron's accounts or limits
   go in `plans/` (the vault), never in git. Write new ones there as
   `plans/<topic>-<YYYY-MM-DD>.md`.
