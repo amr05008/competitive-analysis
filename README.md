@@ -9,7 +9,9 @@ versions ship together.
 Version 0.2 adds the plugin's own MCP server, with tools for page history, job boards,
 Hacker News discussion and SEC filings. The server in `server/` has been live at
 `competitive-analysis.aaronmichaelroy.com` since 2026-10-26; the skill starts using it in
-0.2. 0.2.3 went to OpenAI's review on 2026-11-02, and the Claude submission follows.
+0.2. 0.2.3 has been live in
+[ChatGPT's plugin directory](https://chatgpt.com/plugins/plugin_asdk_app_6ae934b3a1648191b35968ae36210e13)
+since 2026-11-17, and the Claude submission follows.
 
 ## Layout
 
